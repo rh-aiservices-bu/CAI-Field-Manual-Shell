@@ -49,10 +49,11 @@
     {{- if or $navRoot.IsHome (eq $navRoot.Params.sidebar_root_for "self") -}}
     <ul class="td-shell-tree__list td-shell-tree__list--1">
       {{- /* Dropping the cover row also drops the drawer's only way back to
-           the landing page: the sidebar brand row is display:none below md
-           and the open drawer covers the navbar brand. Keep the cover as a
-           row on small screens only, so desktop shows exactly the top-level
-           entries. */ -}}
+           the landing page. Keep the cover as a row on small screens only
+           when there is no other visible way back (the Home cover has no
+           selector row; self-root covers do via td-shell-root in the
+           header, so they must not emit a second link). */ -}}
+      {{- if $navRoot.IsHome }}
       <li class="td-shell-tree__item td-leaf d-md-none">
         <div class="td-shell-tree__row">
           <a href="{{ $navRoot.RelPermalink }}" class="td-shell-tree__link">
@@ -60,6 +61,7 @@
           </a>
         </div>
       </li>
+      {{- end }}
       {{- range partial "shell/nav-children.html" (dict "section" $navRoot) }}
       {{ partial "shell/sidebar-tree-node.html" (dict "page" $context "section" . "shouldDelayActive" $shouldDelayActive "sidebarMenuTruncate" $sidebarMenuTruncate "ulNr" 1 "ulShow" $ulShow "iconPolicy" $iconPolicy "compact" $compact "foldable" $foldable "overflow" $overflow) }}
       {{- end }}
