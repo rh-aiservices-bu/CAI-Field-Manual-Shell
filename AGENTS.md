@@ -31,7 +31,15 @@ Note the root 404 is expected: with a path in baseURL the dev server serves at
   edits): per-manual `sidebar_root_for: self` + `params.ui.sidebar_root_menu:
   true` (`layouts/_partials/shell/root-menu.html:19-25` above `shell/sidebar.html:50`;
   `sidebar-root.html:9-23` resolves per-manual root; `sidebar-root-for` semantics
-  in `sidebar-root.html`/`config.html:33-35`) and a sanctioned
+  in `sidebar-root.html`/`config.html:33-35`). **Selector scope:** `shell/root-
+  menu-roots.html:7-26` seeds the dropdown from *every* `Home.Sections`
+  (unless `sidebar_root_menu: false`) plus `sidebar_root_for: self` roots (TEST B
+  pop showed `field-manual`, `writing-the-field-manual`, `chat`, etc. together);
+  to present this as a manual picker, every non-manual top-level section
+  (`what-is-a-field-manual`, `writing-the-field-manual`, `potential-improvements`,
+  `chat`, …) must carry `sidebar_root_menu: false` and each manual must be a
+  top-level section or `sidebar_root_for: self` root — otherwise the dropdown is
+  a site-section switcher, not a manual picker. Follow with a sanctioned
   `assets/scss/_styles_project.scss` counter fix so the per-manual root row
   (`ul--0`, `td-shell-tree__item--root`) does not consume `1.` — e.g.
   `& > .td-shell-tree__list:has(> .td-shell-tree__item--root){counter-reset:none}`
@@ -44,7 +52,7 @@ Note the root 404 is expected: with a path in baseURL the dev server serves at
   **Gap:** site today uses `params.ui.docs_sidebar_root: home` with whole-site
   tree (hello-world at `list--3` → `N.M.K` via `counters()` at
   `_styles_project.scss:187-215`); this nav is target — implement the levers
-  above before claiming `hello-world` demonstrates it (per
+  and scope filter above before claiming `hello-world` demonstrates it (per
   `conventions.md:8`).
 - Display options: variant blocks `{{< variant mode gitops >}}` (also
   `manual`, `scripted`) and `{{< variant version "3.4" >}}`. Option ids must
