@@ -60,9 +60,11 @@ module:
 Update the shell:
 
 ```sh
-hugo mod get -u github.com/rh-aiservices-bu/CAI-Field-Manual-Shell
+hugo mod get github.com/rh-aiservices-bu/CAI-Field-Manual-Shell
 hugo mod tidy
 ```
+
+Then verify `hugo mod graph` still shows `github.com/pgsty/oink v1.4.0` (the pinned theme); do not use `-u` here — it upgrades transitive deps.
 
 ## Verifying shell changes locally
 
