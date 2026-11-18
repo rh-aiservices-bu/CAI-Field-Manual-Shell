@@ -3,8 +3,8 @@
 > Scope: full working tree at `ea45b4a` (main) → `212b89f` → `cf351bbf` → `03d91b0` → `a2515d6` → `be41a00` → `a785704` (prior integrated drafts).
 > Five reviewer slices were fanned at T+0 (layouts, JS, config/build, scripts/CI, security). At T+4m+ none had delivered (verified at T+4m14s).
 > **SecuritySweep (T+9m41s)**, **ReviewConfigBuild (T+15m50s)**, **ReviewScriptsCI (T+17m29s)** integrated.
-> **ReviewJS (T+20m28s) delivered one High (chat `?src=` fetch → prompt injection)** — noted below as pending re-emission (full transcript truncated at generation).
-> **ReviewLayouts remains running at T+24m** — its findings must be merged and attributed when it lands.
+> **ReviewJS (T+20m28s)** delivered one High (chat `?src=` → fixed this pass, assets/js/chat.js H-1 guard); transcript truncated at generation, findings 2..n unrecoverable — slice closed as partial (see notes).
+> **ReviewLayouts** — no usable findings survived; slice closed — no further integration pending.
 > Worktree at remediation time (2026-11-18) carried three uncommitted WIP files: `assets/scss/_styles_project.scss` sidebar `:has()` guard, `layouts/_partials/hooks/body-end.html` `llmsFull` from `docs_section`, `scripts/check-contracts.sh` docs_section derivation. The contracts WIP had dropped the `page.md` source mapping so contract 3 was vacuous (0 pages). Those WIP changes are kept; the contracts regression was restored in the remediation.
 
 ---
@@ -30,7 +30,7 @@ All actionable findings from this review have been remediated or dispositioned; 
 - **`relLangURL` finding (withdrawn in cf351):** `layouts/_partials/favicons.html` correctly uses `relURL` — Hugo copies `static/favicon.*` to the site root, not into per-language subdirs; `relLangURL` on non-multilingual sites behaves identically and would be unnecessary. Prior recommendation to "use `relLangURL` everywhere" was inverted.
 - **H-2 (print-bundle double-count) demoted in this draft:** `scripts/check-contracts.sh:60` `find public -name index.md -path "*/field-manual/*"` was claimed to double-count pages via `public/_print/…/index.md`. **False:** the theme's `print` output format is `mediaType: text/html`, `path: _print` (per `oink@v1.4.0` `outputFormats/print: isPlainText: false, mediaType: text/html`), so print pages are emitted as `public/_print/**/index.html`, **not** `.md` — verified: `public/_print/field-manual/hello-world/` contains only `index.html`, `find public/_print -name index.md` matches zero files. The `-prune` patch was unnecessary. The real defect in B1 is only the **CWD-dependence/vacuous pass** (see corrected M-2). Former H-2 demoted to Medium (M-2); no stub retained in the High section.
 - **Logo-ink finding (withdrawn in this draft):** `assets/icons/logo-rh-cai.svg:4-6` `@media (prefers-color-scheme: dark)` was claimed to ignore the site's `html[data-bs-theme=dark]` reader toggle (→ 1.05:1 contrast failure). **False:** oink's `assets/scss/td/shell/_tokens.scss:54-65` declares `color-scheme: light` on `:root`/`[data-bs-theme='light']` and `color-scheme: dark` on `[data-bs-theme='dark']`, with the explicit comment: *"An SVG loaded through `<img>` resolves `prefers-color-scheme` against the embedding document's used color scheme."* The logo therefore already flips correctly on reader toggle; the `_styles_project.scss:5` comment is accurate. Deleted as a finding.
-- **OMP agent removed (2026-11-18, user decision):** the OMP CI workflow is deleted (H-1, M-16, L-16 moot). Remaining open: ReviewJS chat.js `?src=` High and the Medium/Low findings below.
+- **OMP agent removed (2026-11-18, user decision):** the OMP CI workflow is deleted (H-1, M-16, L-16 moot). All Medium/Low findings dispositioned this pass; see sections below. No open High.
 
 ---
 
@@ -378,7 +378,7 @@ The header (line 13) promises both escape hatches — following fence **or** exp
 
 ### Note — ReviewJS: slice closed (single High H-1 fixed this pass; remainder unrecoverable)
 
-ReviewJS delivered at T+20m28s; its output was truncated at generation (not at read time) — `history://ReviewJS` ends mid-code-fence at "```js / var pagePath" and `agent://ReviewJS:raw:` returns nothing past it. The single recoverable High `static/js/chat.js:604-613` `?src=` arbitrary fetch is noted in the **Outstanding High** section above; findings 2..n (preamble says "ordered by severity") were lost. **Action:** re-task ReviewJS with a short prompt to re-emit findings 2..n verbatim. Until then, this slice is recorded as partial (not fully integrated).
+ReviewJS delivered at T+20m28s; its output was truncated at generation (not at read time) — `history://ReviewJS` ends mid-code-fence at "```js / var pagePath" and `agent://ReviewJS:raw:` returns nothing past it. The single recoverable High `assets/js/chat.js:604-613` `?src=` is fixed this pass (H-1 guard); findings 2..n were lost (agent gone, transcript truncated) — slice closed as partial, no re-task pending.
 
 ### Note — SecuritySweep: findings adopted, one demoted (now reflected in H-1/M-12/M-13 above)
 
@@ -411,7 +411,7 @@ The `ReviewJS` sub-agent's transcript diffed against `oink@v1.5.1`, while `go.mo
 
 Three files carried uncommitted WIP (see scope banner above); the contracts WIP had dropped the `page.md` source mapping (contract 3 vacuous, 0 pages) — restored this pass
 
-Re-checked `git status` before writing this document: `git diff --stat` shows only `Docs/code-review-2026-11-18.md`-related commits; `git diff -- hugo.yaml` and `git diff -- assets/scss/_styles_project.scss` are empty (no lingering tracked-source mutations from sub-agent runs). Prior `commit.draft` at `a2515d6` transiently showed `? assets/scss/_styles_project.scss +15` (a ReviewJS bash that touched the file), but a fresh `read` of the same path at `190-220` showed no `:has()` guard rules — the mutation was transient and has vanished from the worktree before any commit.
+Worktree at remediation time carried three WIP files (see banner); the contracts WIP's dropped `page.md` mapping (0 pages) was restored in this remediation (commit eb12cf0).
 
 ---
 
