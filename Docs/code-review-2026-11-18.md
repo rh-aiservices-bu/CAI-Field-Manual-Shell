@@ -18,7 +18,7 @@
 | 🟡 Low | 16 | Polish / hygiene |
 | **Total** | **34** | (plus attribution/provenance notes — not counted) |
 
-The repo is in good shape: XSS posture is solid, shell scripts are well-commented, and the variant/customize system is unusually careful for a docs theme. Most findings are edge cases, stale docs, or hardening. The remaining **High** (H-1 CI trust boundary) has real attack value; the former H-2 and M-6 were corrected.
+The repo is in good shape: XSS posture is solid, shell scripts are well-commented, and the variant/customize system is unusually careful for a docs theme. Most findings are edge cases, stale docs, or hardening. The remaining **High** (H-1 CI trust boundary) has real attack value; the print-bundle double-count High was demoted to M-2 and the logo-ink finding was withdrawn — see corrections log — so the High section now holds one item.
 
 ### Corrections log (prior drafts)
 
@@ -415,12 +415,11 @@ Re-checked `git status` before writing this document: `git diff --stat` shows on
 
 ## Recommended next steps (priority order)
 
-1. **Harden CI trust boundary** (H-1, M-15/M-16) — restrict `omp` trigger to collaborators, fix `pull_request_review_comment` payload shape, and drop `AGENT_API_KEY` from the agent's env.
-2. **Harden `check-contracts.sh` contracts** (M-2, M-7/M-8/M-9/M-10/M-11/M-14/L-14/L-15) — derive variant labels from `hugo.yaml` and assert them; add named-param coverage; add freshness guard + CWD guard; scope lookups to `params.variants`; fix YAML + shell brittleness.
-3. **Shell hygiene** (M-5, M-6, M-1/M-3/M-4/M-5, M-12/M-13) — `.gitignore` gap for `hugo.work`, `static/` asset cache-busting, publication-gate header + WARN anchoring + `pipefail`, and `Docs` staleness (M-16/L-4/L-9/L-10/L-11).
-4. **Add chat completion timeout** (M-14) + CSP/referrer meta (M-13/M-14) + triage ReviewJS `?src=` High (Outstanding section) — user-visible hang + hardening.
-5. **Tighten omp.yml hardening** (L-16) — `timeout-minutes`, substring-trigger anchoring, model token vars.
+1. **Triage ReviewJS `?src=` High** (chat.js:604-613) — arbitrary cross-origin fetch feeding the assistant system context; the only open High.
+2. **Harden `check-contracts.sh`** (M-2, M-7/M-8/M-9/M-10/M-11/M-14/L-14/L-15) — derive variant labels from `hugo.yaml` and assert them; add named-param coverage; add freshness + CWD guards; fix YAML and shell brittleness.
+3. **Shell hygiene** (M-5, M-1/M-3/M-4/M-6) — `.gitignore` gap for `hugo.work`, `static/` asset cache-busting, publication-gate header + WARN anchoring + `pipefail`, Docs staleness (M-17/L-4/L-9/L-10/L-11).
+4. **CSP/referrer meta** (M-14) and remaining JS polish (M-13, L-2/L-3).
 
 ---
 
-*Report at `a785704` scope plus structural corrections (H-2 stub removed under 🔴 High — now only in corrections log; M-1b→plain M-2 renumber propagated; L-14 deduplicated) and worktree hygiene (`git restore hugo.yaml`/`assets/scss`; now clean except this file). ReviewJS re-task needed for findings 2..n (truncated at generation); ReviewLayouts remains running at T+24m+. Total: 34 findings (1 high / 17 medium / 16 low).*
+*Report at `a785704` scope plus OMP workflow removed 2026-11-18 (H-1/M-16/L-16 resolved by deletion; 29 findings remain — 0 high / 14 medium / 15 low — H-1 was the only High; M-16 and L-16 were OMP). Cross-reference fixes (line 21: no longer collides with live M-6; item 3 M-5 dup removed; item 4: dropped phantom chat-timeout ref; items re-mapped to M-1..M-17) and ReviewLayouts integration pending. Worktree changes: `Docs/code-review-2026-11-18.md` annotated; `.github/workflows/omp.yml` deleted; `README.md`/`AGENTS.md` OMP sections removed. 29 findings open (see Recommended next steps).*
