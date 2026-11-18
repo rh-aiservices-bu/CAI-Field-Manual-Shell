@@ -8,18 +8,27 @@ content repos (e.g.
 via `hugo.yaml` → `module.imports`. It is **not a site** and has no GitHub
 Pages deploy — the rendered site lives in the content repo.
 
+## Prerequisites
+
+- Hugo Extended ≥ 0.168.
+- **Dart Sass on `PATH`** — `layouts/_partials/head-css.html` sets
+  `transpiler: dartsass`; Hugo Extended does **not** bundle Dart Sass
+  ([`oink` comment `head-css.html:2-3`](https://github.com/pgsty/oink/blob/main/layouts/_partials/head-css.html#L2)).
+  Install with `brew install sass/sass/sass`, `npm i -g sass`, or
+  `snap install dart-sass`. Without it the build fails before the publication
+  gate's WARN filter runs.
+
 ## What it exports
 
 **Layout overrides** (Hugo mounts merge these into the importing site):
 
 - Pinned copies of oink v1.4.0 files — each headed by a provenance comment naming
-  each of its deliberate changes (page-top selector call; Home promoted to the tree's
-  top level with a small-screen Home row; pager rooted at the page's own section
-  instead of the site root). Re-diff all seven against
+  its deliberate changes. Re-diff all eight against
   `~/go/pkg/mod/github.com/pgsty/oink@v<ver>/` on a theme bump:
   - `layouts/docs/baseof.html` — page-top selector call before version banner
-  - `layouts/_partials/shell/sidebar-tree.html` — Home promoted to tree's top level with small-screen Home row
+  - `layouts/_partials/shell/sidebar-tree.html` — Home + `sidebar_root_for: self` promoted to tree's top level with small-screen cover row
   - `layouts/_partials/pager-state.html` — pager rooted at the page's own section
+  - `layouts/_partials/head-css.html` — switches to `transpiler: dartsass` (silences oink/Bootstrap `libSass` `@import` deprecations), fixes RTL `Integrity` scoping
   - `layouts/_partials/actions/context.html` — open_gemini + feed_agent rows (feed_agent gated on `params.github_repo`)
   - `layouts/_partials/actions/title-menu.html` — open_gemini + feed_agent rows (feed_agent gated on `params.github_repo`)
   - `assets/js/action-registry.js` — open_gemini + feed_agent action kinds
@@ -36,6 +45,7 @@ Pages deploy — the rendered site lives in the content repo.
   tags (upstream's `os.ReadDir "static"` probe misses module `static/`).
   Re-diff on theme bump is not needed; if you add/remove favicons in
   `static/`, update this file to match.
+- Dart Sass compat overlay (not upstream): `assets/scss/td/_chroma.scss` + `assets/scss/td/chroma/_dark-wrapped.scss` — hoists oink's nested `@import 'chroma/dark'` out of its `@if/@selector` wrapper, which LibSass tolerated but Dart Sass rejects. The overlay is paired with `head-css.html`'s `dartsass` switch; drop both when upstream migrates to `@use`.
 - `assets/js/agent-setup.js` + `assets/css/agent-setup.css` — the *Feed it to my AI Agent* copy-prompt modal
 - `assets/js/chat.js` + `assets/css/chat.css` — the chat assistant runtime
 - `assets/icons/logo-rh-cai.svg` + `assets/scss/_styles_project.scss` (nav, header, layout)
@@ -56,6 +66,7 @@ Pages deploy — the rendered site lives in the content repo.
 module:
   imports:
     - path: github.com/rh-aiservices-bu/CAI-Field-Manual-Shell
+      version: 4968e45a45d7
   hugoVersion:
     extended: true
     min: 0.168.0
@@ -66,9 +77,21 @@ Update the shell:
 ```sh
 hugo mod get github.com/rh-aiservices-bu/CAI-Field-Manual-Shell
 hugo mod tidy
+# or pin a specific commit:
+# hugo mod get github.com/rh-aiservices-bu/CAI-Field-Manual-Shell@<sha>
 ```
 
 Then verify `hugo mod graph` still shows `github.com/pgsty/oink v1.4.0` (the pinned theme); do not use `-u` here — it upgrades transitive deps.
+
+Content repo CI must install Dart Sass before the publication gate (see content repo's `.github/workflows/github-pages.yaml` — both `build` and `pr-gate` jobs):
+
+```yaml
+      - name: Install Dart Sass
+        run: npm install -g sass   # or brew / snap equivalent on self-hosted
+```
+
+Without this the `head-css.html` override's `transpiler: dartsass` has no
+binary and the build errors before WARN filtering.
 
 ## Verifying shell changes locally
 
@@ -94,7 +117,9 @@ sh ../CAI-Field-Manual-Shell/scripts/check-contracts.sh
 unset HUGO_MODULE_WORKSPACE
 ```
 
-Verify with `hugo mod graph` and `hugo config` that the replacement is active.
+Verify `sass --version` prints a Dart Sass version before running — the gate
+needs it on this machine too. Then verify with `hugo mod graph` and
+`hugo config` that the replacement is active.
 `hugo.work` is gitignored — never commit it.
 
 ## Disclaimers

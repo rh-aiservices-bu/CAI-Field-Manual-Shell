@@ -1,5 +1,5 @@
 {{/* Pinned copy of oink v1.4.0 layouts/_partials/shell/sidebar-tree.html.
-     Two changes from the theme file: (1) the level-0 list body -- when the
+     Three changes from the theme file: (1) the level-0 list body -- when the
      navigation root is the site Home (params.ui.docs_sidebar_root: home),
      the Home page is a cover, not a menu entry, so its children render as
      the top level of the tree; they keep ulNr 1 and the theme's level-1
@@ -7,8 +7,13 @@
      so the drawer keeps its way back to the landing page. (2) the mobile
      Home row renders no icon -- the numbered workshop-chrome nav
      (params.ui.sidebar_icon_policy: none + CSS counters in
-     assets/scss/_styles_project.scss) keeps the tree mark-free.
-     Re-diff against the theme file on a theme bump. */ -}}
+     assets/scss/_styles_project.scss) keeps the tree mark-free. (3) a
+     per-manual self-root (sidebar_root_for: self) is also a cover: the
+     manual name already sits in the selector above the tree
+     (shell/root-menu.html), so the tree renders the section's children at
+     ulNr 1 instead of a duplicate td-shell-tree__item--root row at ulNr 0
+     that would steal "1." from the first chapter. Re-diff against the theme
+     file on a theme bump. */ -}}
 {{ $context := .context -}}
 {{ $sidebarRoot := .sidebarRoot -}}
 {{ $sidebarRootID := .sidebarRootID -}}
@@ -37,13 +42,17 @@
     {{ $sidebarMenuTruncate := partial "validate.html" (dict
         "value" .Site.Params.ui.sidebar_menu_truncate "kind" "int"
         "min" 1 "fallback" 2000 "key" "params.ui.sidebar_menu_truncate") -}}
-    {{- /* Home as root: promote its children to the top level. */ -}}
-    {{- if $navRoot.IsHome -}}
+    {{- /* Home or per-manual self-root: both are covers, their children are
+         the top level of the tree. Without this the self-root case renders
+         the manual itself as ul--0 > li--root, duplicating the selector row
+         (td-shell-root--static / td-shell-root) above the tree. */ -}}
+    {{- if or $navRoot.IsHome (eq $navRoot.Params.sidebar_root_for "self") -}}
     <ul class="td-shell-tree__list td-shell-tree__list--1">
-      {{- /* Dropping the Home cover row also drops the drawer's only way back
-           to the landing page: the sidebar brand row is display:none below md
-           and the open drawer covers the navbar brand. Keep Home as a row on
-           small screens only, so desktop shows exactly the top-level entries. */ -}}
+      {{- /* Dropping the cover row also drops the drawer's only way back to
+           the landing page: the sidebar brand row is display:none below md
+           and the open drawer covers the navbar brand. Keep the cover as a
+           row on small screens only, so desktop shows exactly the top-level
+           entries. */ -}}
       <li class="td-shell-tree__item td-leaf d-md-none">
         <div class="td-shell-tree__row">
           <a href="{{ $navRoot.RelPermalink }}" class="td-shell-tree__link">
