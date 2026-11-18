@@ -1,65 +1,13 @@
-title: CAI Field Manual
-baseURL: https://rh-aiservices-bu.github.io/CAI-Field-Manual-prototype/
-defaultContentLanguage: en
-disableLanguages: [zh, fr]
-enableGitInfo: true
-enableRobotsTXT: true
-enableEmoji: true
-timeZone: UTC
-
-languages:
-  en:
-    label: English
-    locale: en-US
-    weight: 1
-    title: CAI Field Manual
-    params:
-      description: Documentation, updates, and manuals for your project.
-  # Keep disabled languages declared so Hugo recognizes .zh.md and .fr.md as
-  # translations instead of treating them as duplicate English pages.
-  zh:
-    label: 简体中文
-    locale: zh-CN
-    weight: 2
-    title: CAI Field Manual
-    hasCJKLanguage: true
-  fr:
-    label: Français
-    locale: fr-FR
-    weight: 3
-    title: CAI Field Manual
-
-markup:
-  goldmark:
-    renderer:
-      unsafe: true
-    parser:
-      attribute:
-        block: true
-      wrapStandAloneImageWithinParagraph: false
-  highlight:
-    noClasses: false
-
-services:
-  googleAnalytics:
-    ID: G-7ZXCS2MF1D
-
-outputs:
-  home: [HTML, RSS, markdown, LLMS]
-  page: [HTML, markdown]
-  # LLMSFULL is enabled per section in front matter: the theme emits it only
-  # for a top-level section and warns for nested ones, so a site-wide section
-  # output trips /field-manual/hello-world/. content/field-manual/_index.md
-  # opts in; the chat page reads that bundle as its whole-manual context.
-  section: [HTML, RSS, print, markdown]
+# CAI Field Manual shell — Hugo module config (chrome defaults only).
+# This repo is imported as a module by content repos (e.g.
+# CAI-Field-Manual-Hello-World); it is not a runnable site: no content, no
+# baseURL, no deploy. Site config (title, baseURL, menus, outputs, markup,
+# services, github_repo) and the variant/customize declarations live in the
+# importing site, where scripts/check-contracts.sh can validate content
+# against them at the site root.
 
 params:
-  # Red Hat CAI Team lockup (fedora + divider + wordmark); sized for the
-  # 4.3:1 aspect in assets/scss/_styles_project.scss. Ink follows the site
-  # theme toggle via the SVG's own prefers-color-scheme query.
   logo: icons/logo-rh-cai.svg
-  github_repo: https://github.com/rh-aiservices-bu/CAI-Field-Manual-prototype
-  github_branch: main
   offline_search: true
   copyright:
     authors: Project contributors
@@ -68,76 +16,17 @@ params:
   ui:
     preset: paper
     preset_menu: [paper, slate, ink, terminal]
-    # Wordmark follows each preset's UI face (var(--td-ui-font-family))
-    # via the :root override in assets/scss/_styles_project.scss, so a
-    # Slate/Ink/Terminal reader never sees a foreign face in the brand row.
     dark_mode: true
     section_index: cards
     blog_index: cards
     sidebar_menu_foldable: true
-    # Left nav shows the whole site tree from Home: the three top-level
-    # entries (field manual, chat, why this approach) each expand in place,
-    # instead of the root switcher swapping one section's tree at a time.
     docs_sidebar_root: home
     sidebar_root_menu: false
-    # Numbered workshop-chrome nav (B): CSS counters give the top level "N."
-    # and its children "N.M", so icon rows are gone from the tree --
-    # `all`/`groups` would paint marks next to the numbers; marks stay in
-    # landing cards, page headers, and the navbar.
     sidebar_icon_policy: none
     docs_section: field-manual
     share: [claude, chatgpt, linkedin, email, copy]
     page_context_menu:
       assistant_links: true
-  # Display options: the page-top selector (layouts/_partials/
-  # td-variant-selector.html, called by the docs/baseof.html override)
-  # persists these in localStorage and filters content blocks tagged with
-  # the variant shortcode. Ordered slice: render order in the selector and
-  # the Customize form. Every axis needs `neutral` (the show-all option id,
-  # never hides and never hidden) and a `default` that is one of its option
-  # ids. Block ids may list several options: {{< variant version "3.5 3.6" >}}.
-  variants:
-    - id: version
-      label: RHAIE Version
-      default: '3.6'
-      neutral: all
-      status:
-        specific: 'RHAIE {value}'
-        neutral: all versions
-      options:
-        - { id: all, label: Show all }
-        - { id: '3.4', label: '3.4' }
-        - { id: '3.5', label: '3.5' }
-        - { id: '3.6', label: '3.6' }
-    - id: mode
-      label: Ops Mode
-      default: all
-      neutral: all
-      status:
-        specific: '{value} steps'
-        neutral: every ops mode
-      options:
-        - { id: all, label: Show all }
-        - { id: gitops, label: GitOps }
-        - { id: manual, label: Manual }
-        - { id: scripted, label: Scripted }
-  # Customize fields: text values the reader sets once on the "Customize
-  # this!" page and that substitute into every `customize` shortcode token
-  # across the manuals. Defaults are the shipped examples, not real values.
-  customize:
-    - { id: user, label: Your name, default: guest }
-    - { id: cluster, label: Cluster, default: .ocp.abcd.sandbox1234.opentlc.com }
-
-# Site header navigation. oink renders .Site.Menus.main in the navbar center
-# zone and the home mobile drawer; the entry's page supplies the icon, and
-# llms.txt lists it under Site index. Field Manual stays reachable through the
-# landing cards and the sidebar, so Chat is the only entry for now.
-menus:
-  main:
-    - identifier: chat
-      name: Chat
-      pageRef: /chat
-      weight: 30
 
 module:
   imports:

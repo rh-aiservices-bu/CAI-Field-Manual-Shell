@@ -1,65 +1,40 @@
-# Repository Guidance
+# Repository Guidance — Shell (chrome / rules module)
 
-Hugo Extended >= 0.168 + Go >= 1.27 documentation site (theme via Hugo modules,
-no Node.js). README.md is the source of truth for setup and architecture.
+This repo is a **Hugo module** consumed by content repos (e.g.
+`CAI-Field-Manual-Hello-World`) for look-and-feel and build rules. It has no
+own build — Shell changes are proven by building the Hello-World site against
+this working tree via the `hugo.work` replacement described in README.md.
 
-## Before you push: the publication gate (mandatory)
+Content rules (manuals, writing doctrine, variant/customize conventions) live
+in `CAI-Field-Manual-Hello-World`'s `AGENTS.md`.
 
-There is no test suite. The only correctness check is the production build:
+## Before you declare a shell change done: the publication gate
+
+The gate runs in **content repos' CI** as `shell/scripts/publication-gate.sh`
+(the content repo checks out this repo at `shell/` and runs the gate there).
+Locally, prove a shell change the same way — from a sibling clone of
+`CAI-Field-Manual-Hello-World` with a `hugo.work` replacement:
+
+```
+go 1.27.3
+
+use .
+
+replace github.com/rh-aiservices-bu/CAI-Field-Manual-Shell => ../CAI-Field-Manual-Shell
+```
+
+Then from the Hello-World repo root:
 
 ```sh
-hugo --cleanDestinationDir --gc --minify --environment production \
+HUGO_MODULE_WORKSPACE=hugo.work hugo --cleanDestinationDir --gc --minify --environment production \
   --printPathWarnings 2>&1 | grep -i warn | grep -v "css.Sass: libsass"
 ```
 
 No output = clean. Build failure or any other WARN = not done. Fix and re-run.
-Note the root 404 is expected: with a path in baseURL the dev server serves at
-`http://localhost:1313/CAI-Field-Manual-prototype/`.
+`hugo.work` is gitignored — never commit it.
 
-## Content rules
-- Manuals live in `content/field-manual/<manual>/`. New manual = duplicate the
-  blank skeleton in `content/field-manual/hello-world/`.
-- Author doctrine: read `content/writing-the-field-manual/conventions.md` before
-  writing manual pages. Six conventions: chronological information architecture
-  (field-work timeline → `1..N` chapters with `N.M` children; manual name in the
-  selector above the left nav; `h1/h2/h3` right TOC), status-gate verification
-  (every command + verify + literal expected output), inline known issues,
-  variant selector axes, customize tokens, dual consumption.
-- Nav shape (target, not yet shipped): left nav must read `1` → `N` top chapters
-  with two-level fold/unfold (`N.M`), header is `CAI Field Manual` only, manual
-  name sits in the selector directly above the tree. Levers (no pinned-file
-  edits): per-manual `sidebar_root_for: self` + `params.ui.sidebar_root_menu:
-  true` (`layouts/_partials/shell/root-menu.html:19-25` above `shell/sidebar.html:50`;
-  `sidebar-root.html:9-23` resolves per-manual root; `sidebar-root-for` semantics
-  in `sidebar-root.html`/`config.html:33-35`). **Selector scope:** `shell/root-
-  menu-roots.html:7-26` seeds the dropdown from *every* `Home.Sections`
-  (unless `sidebar_root_menu: false`) plus `sidebar_root_for: self` roots (TEST B
-  pop showed `field-manual`, `writing-the-field-manual`, `chat`, etc. together);
-  to present this as a manual picker, every non-manual top-level section
-  (`what-is-a-field-manual`, `writing-the-field-manual`, `potential-improvements`,
-  `chat`, …) must carry `sidebar_root_menu: false` and each manual must be a
-  top-level section or `sidebar_root_for: self` root — otherwise the dropdown is
-  a site-section switcher, not a manual picker. Follow with a sanctioned
-  `assets/scss/_styles_project.scss` counter fix so the per-manual root row
-  (`ul--0`, `td-shell-tree__item--root`) does not consume `1.` — e.g.
-  `& > .td-shell-tree__list:has(> .td-shell-tree__item--root){counter-reset:none}`
-  + `.td-shell-tree__item--root{counter-increment:none}` so chapters render
-  `1.` and children `1.1` (bare `counter-increment:none` alone yields `0.1` via
-  `counters(td-nav,".")`). Verify in a throwaway production build
-  (`hugo --cleanDestinationDir --gc --minify --environment production
-  --printPathWarnings`) that `::before` renders `1.` and prev/next pager still
-  roots at `FirstSection` (`layouts/_partials/pager-state.html` unchanged).
-  **Gap:** site today uses `params.ui.docs_sidebar_root: home` with whole-site
-  tree (hello-world at `list--3` → `N.M.K` via `counters()` at
-  `_styles_project.scss:187-215`); this nav is target — implement the levers
-  and scope filter above before claiming `hello-world` demonstrates it (per
-  `conventions.md:8`).
-- Display options: variant blocks `{{< variant mode gitops >}}` (also
-  `manual`, `scripted`) and `{{< variant version "3.4" >}}`. Option ids must
-  exist in `hugo.yaml` `params.variants`. Never delete a variant block to fix a
-  rendering complaint — markdown/llms.txt outputs show ALL variants.
-- Customize tokens: `{{< customize user >}}` and `{{< customize cluster >}}`.
-  Never hardcode names or cluster hosts.
+Changes to `scripts/publication-gate.sh` or `scripts/check-contracts.sh`
+themselves are validated by Hello-World's build (which runs the updated scripts).
 
 ## Do not touch without re-diffing
 
@@ -72,13 +47,13 @@ naming its one deliberate change. Any edit beyond that change requires
 re-diffing against `~/go/pkg/mod/github.com/pgsty/oink@v1.4.0/`.
 Sanctioned extension points (free to edit): `td-variant-selector.html`,
 `hooks/head-end.html`, `hooks/body-end.html`, the customize shortcodes,
-`static/js/`, `static/css/`, `hugo.yaml`, `data/home.yaml`, `content/`.
+`static/js/`, `static/css/`, `hugo.yaml`, `assets/scss/_styles_project.scss`.
 
 ## Verification for JS changes
 
 Interactive behavior lives in `static/js/` and `assets/js/`. If you change it,
-verify the rendered page actually works (dev server + browser), not just that
-the build passes.
+verify the rendered page actually works (dev server + browser against the
+Hello-World site via `hugo.work`), not just that the build passes.
 
 ## omp agent (CI)
 

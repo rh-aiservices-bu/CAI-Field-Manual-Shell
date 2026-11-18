@@ -1,4 +1,4 @@
-module github.com/pgsty/oink-starter
+module github.com/rh-aiservices-bu/CAI-Field-Manual-Shell
 
 go 1.27.3
 

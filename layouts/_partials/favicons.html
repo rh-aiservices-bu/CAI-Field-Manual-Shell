@@ -1,0 +1,11 @@
+{{/* Shell override of oink favicons.html: emit the Shell's known favicons
+     unconditionally. The upstream partial probes os.ReadDir "static" which only
+     sees the site repo's own static/ — after the Shell split, the favicons
+     live in the Shell module's static/ and the probe misses them, leaving
+     the split site with no favicon <link> tags. The set here mirrors
+     static/favicon.{ico,svg} + sized variants + apple-touch-icon.png. */ -}}
+<link rel="icon" href="{{ "favicon.ico" | relURL }}" />
+<link rel="icon" href="{{ "favicon.svg" | relURL }}" type="image/svg+xml" />
+<link rel="icon" href="{{ "favicon-16x16.png" | relURL }}" type="image/png" sizes="16x16" />
+<link rel="icon" href="{{ "favicon-32x32.png" | relURL }}" type="image/png" sizes="32x32" />
+<link rel="apple-touch-icon" href="{{ "apple-touch-icon.png" | relURL }}" />

@@ -24,7 +24,7 @@
   'use strict';
 
   var CFG = window.__TD_AGENT_SETUP__ || {};
-  var REPO = CFG.repo || 'rh-aiservices-bu/CAI-Field-Manual-prototype';
+  var REPO = CFG.repo || 'rh-aiservices-bu/CAI-Field-Manual-Hello-World';
   var CLONE_URL = 'https://github.com/' + REPO + '.git';
   var CLONE_DIR = REPO.split('/').pop();
 
