@@ -261,3 +261,10 @@ code.td-customize-token {
     grid-column: 2;
   }
 }
+// Rendered content images: 1px visible outline so light screenshots do not
+// bleed into the page canvas. Scoped to .td-content so chrome marks (navbar
+// logo, sidebar brand, icons) are untouched. Uses the theme border token so
+// the line adapts to paper/slate/ink/terminal and to dark mode.
+.td-content img {
+  border: 1px solid var(--bs-border-color);
+}
