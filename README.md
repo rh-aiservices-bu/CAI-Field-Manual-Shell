@@ -13,10 +13,17 @@ Pages deploy — the rendered site lives in the content repo.
 **Layout overrides** (Hugo mounts merge these into the importing site):
 
 - Pinned copies of oink v1.4.0 files — each headed by a provenance comment naming
-  its one deliberate change (page-top selector call; Home promoted to the tree's
+  each of its deliberate changes (page-top selector call; Home promoted to the tree's
   top level with a small-screen Home row; pager rooted at the page's own section
-  instead of the site root). Re-diff all three against
+  instead of the site root). Re-diff all seven against
   `~/go/pkg/mod/github.com/pgsty/oink@v<ver>/` on a theme bump:
+  - `layouts/docs/baseof.html` — page-top selector call before version banner
+  - `layouts/_partials/shell/sidebar-tree.html` — Home promoted to tree's top level with small-screen Home row
+  - `layouts/_partials/pager-state.html` — pager rooted at the page's own section
+  - `layouts/_partials/actions/context.html` — open_gemini + feed_agent rows (feed_agent gated on `params.github_repo`)
+  - `layouts/_partials/actions/title-menu.html` — open_gemini + feed_agent rows (feed_agent gated on `params.github_repo`)
+  - `assets/js/action-registry.js` — open_gemini + feed_agent action kinds
+  - `assets/js/page-actions.js` — open_gemini + feed_agent bindings
 - Sanctioned extension points — not copies, free to edit (the theme ships both hooks empty):
   - `layouts/_partials/td-variant-selector.html`
   - `layouts/_partials/hooks/head-end.html` (page-top selector + pre-paint persistence runtime)
@@ -29,19 +36,16 @@ Pages deploy — the rendered site lives in the content repo.
   tags (upstream's `os.ReadDir "static"` probe misses module `static/`).
   Re-diff on theme bump is not needed; if you add/remove favicons in
   `static/`, update this file to match.
-- `layouts/_partials/google_analytics.html` — GA4 partial (the theme's head.html calls it in production)
-**Assets / static**:
-
+- `assets/js/agent-setup.js` + `assets/css/agent-setup.css` — the *Feed it to my AI Agent* copy-prompt modal
+- `assets/js/chat.js` + `assets/css/chat.css` — the chat assistant runtime
 - `assets/icons/logo-rh-cai.svg` + `assets/scss/_styles_project.scss` (nav, header, layout)
-- `static/js/agent-setup.js` + `static/css/agent-setup.css` — the *Feed it to my AI Agent* copy-prompt modal
-- `static/js/chat.js` + `static/css/chat.css` — the chat assistant runtime
+- `layouts/_partials/google_analytics.html` — GA4 partial (the theme's head.html calls it in production)
 - `static/favicon*`, `static/apple-touch-icon.png`
 
-**Scripts** (run by content repos' CI via a `shell/` checkout):
+**Scripts**:
 
-- `scripts/publication-gate.sh` — wraps the production build gate (build must
-  succeed; only WARN allowed is the known oink libsass deprecation).
-- `scripts/check-contracts.sh` — validates dual-consumption contracts against
+- `scripts/publication-gate.sh` — runs in content repos' CI via a `shell/` checkout.
+- `scripts/check-contracts.sh` — a local gate (add it to CI to enforce): validates dual-consumption contracts against
   the built `public/` (variant axes/options, customize tokens, variant labels,
   status-gate fences).
 
@@ -68,7 +72,7 @@ Then verify `hugo mod graph` still shows `github.com/pgsty/oink v1.4.0` (the pin
 
 ## Verifying shell changes locally
 
-Shel changes are proven by building the Hello-World site against this working
+Shell changes are proven by building the Hello-World site against this working
 tree (the Shell repo has no own build). From a sibling clone of
 `CAI-Field-Manual-Hello-World`, create `hugo.work` containing:
 

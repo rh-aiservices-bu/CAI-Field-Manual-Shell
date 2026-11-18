@@ -43,15 +43,14 @@ Files under `layouts/` and `assets/js/` marked as pinned oink v1.4.0 copies
 `layouts/_partials/pager-state.html`, `assets/js/action-registry.js`,
 `assets/js/page-actions.js`, `layouts/_partials/actions/context.html`,
 `layouts/_partials/actions/title-menu.html`) each carry a provenance comment
-naming its one deliberate change. Any edit beyond that change requires
+naming its deliberate changes. Any edit beyond those changes requires
 re-diffing against `~/go/pkg/mod/github.com/pgsty/oink@v1.4.0/`.
 Sanctioned extension points (free to edit): `td-variant-selector.html`,
 `hooks/head-end.html`, `hooks/body-end.html`, the customize shortcodes,
-`static/js/`, `static/css/`, `hugo.yaml`, `assets/scss/_styles_project.scss`.
+`assets/js/`, `assets/css/`, `hugo.yaml`, `assets/scss/_styles_project.scss`.
 
 ## Verification for JS changes
 
-Interactive behavior lives in `static/js/` and `assets/js/`. If you change it,
+Interactive behavior lives in `assets/js/` and `assets/css/`. If you change it,
 verify the rendered page actually works (dev server + browser against the
 Hello-World site via `hugo.work`), not just that the build passes.
-

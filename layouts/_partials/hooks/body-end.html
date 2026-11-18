@@ -1,4 +1,4 @@
-{{- /* Chat assistant runtime (static/js/chat.js). The bundle URL is injected
+{{- /* Chat assistant runtime (assets/js/chat.js, resources pipeline). The bundle URL is injected
      because relLangURL must resolve here, not in JS: the chat page's
      whole-manual context is the field-manual LLMSFULL output, which sits
      under the site's base path on GitHub Pages.
@@ -7,14 +7,20 @@
      Chat-link source forwarding, so print bundles and every other page stay
      inert. */ -}}
 <script>window.__TD_CHAT__ = { llmsFull: "{{ "field-manual/llms-full.txt" | relLangURL }}" };</script>
-<script src="{{ "js/chat.js" | relLangURL }}" defer></script>
+{{- $chatJs := resources.Get "js/chat.js" }}
+{{- if hugo.IsProduction }}{{ $chatJs = $chatJs | minify | fingerprint }}{{ end }}
+<script src="{{ $chatJs.RelPermalink }}" defer></script>
 {{- /* "Feed it to my AI Agent" page action / palette row modal
-     (static/js/agent-setup.js). The repo is injected the same way
+     (assets/js/agent-setup.js). The repo is injected the same way
      chat.js gets llmsFull, so the clone URL has one source
-     (params.github_repo) instead of a second literal in the JS. The
-     script guards itself: with no palette in the DOM it is inert, so
-     print bundles and search-off pages stay untouched. */ -}}
-<script>window.__TD_AGENT_SETUP__ = {
-  repo: "{{ printf "%s" site.Params.github_repo | strings.TrimPrefix "https://github.com/" }}"
-};</script>
-<script src="{{ "js/agent-setup.js" | relLangURL }}" defer></script>
+     (params.github_repo) instead of a second literal in the JS. With no
+     github_repo configured the blob omits the repo key, the agent-setup
+     menu row is hidden, and the script stays inert. It also guards
+     itself: with no palette in the DOM, print bundles and search-off
+     pages stay untouched. */ -}}
+{{- with site.Params.github_repo }}<script>window.__TD_AGENT_SETUP__ = {
+  repo: "{{ printf "%s" . | strings.TrimPrefix "https://github.com/" | strings.TrimSuffix "/" }}",
+};</script>{{ end -}}
+{{- $agentSetupJs := resources.Get "js/agent-setup.js" }}
+{{- if hugo.IsProduction }}{{ $agentSetupJs = $agentSetupJs | minify | fingerprint }}{{ end }}
+<script src="{{ $agentSetupJs.RelPermalink }}" defer></script>

@@ -5,14 +5,18 @@
 # (.github/workflows/github-pages.yaml, both build and pr-gate jobs) and is
 # safe to run locally:
 #
-#   scripts/publication-gate.sh [extra hugo args...]
+# Run from the content repo root (the importing site), not from the Shell
+# checkout:
+#
+#   sh ../CAI-Field-Manual-Shell/scripts/publication-gate.sh [extra hugo args...]
 #
 # Extra arguments are appended to the hugo command, e.g.:
-#   scripts/publication-gate.sh --baseURL "https://example.invalid/site/"
+#   sh ../CAI-Field-Manual-Shell/scripts/publication-gate.sh --baseURL "https://example.invalid/site/"
 
 set -eu
+(set -o pipefail 2>/dev/null) && set -o pipefail || true
 
-log=build-gate.log
+log=$(mktemp "${TMPDIR:-/tmp}/build-gate.XXXXXX")
 trap 'rm -f "$log"' EXIT
 
 # shellcheck disable=SC2086
@@ -24,9 +28,9 @@ hugo --cleanDestinationDir --gc --minify --environment production \
 }
 cat "$log"
 
-if grep -i warn "$log" | grep -qv 'css.Sass: libsass'; then
+if grep -E '^WARN' "$log" | grep -qv 'css.Sass: libsass'; then
     echo "::error::Publication gate failed: unexpected WARN output" >&2
-    grep -i warn "$log" | grep -v 'css.Sass: libsass' >&2
+    grep -E '^WARN' "$log" | grep -v 'css.Sass: libsass' >&2
     exit 1
 fi
 

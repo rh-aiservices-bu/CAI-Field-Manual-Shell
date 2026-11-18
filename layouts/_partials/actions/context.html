@@ -1,3 +1,6 @@
+{{- /* Pinned copy of oink v1.4.0 layouts/_partials/actions/context.html.
+     Deliberate changes: (1) the open_gemini row; (2) the feed_agent row with
+     its github_repo availability gate. Re-diff on a theme bump. */ -}}
 {{- /* Build page-local descriptors for stable action IDs. Keep URL
      construction in Hugo so the page rail and Command Palette share it. */ -}}
 {{- $p := . -}}
@@ -90,6 +93,7 @@
 {{- end -}}
 {{- $shellConfig := partialCached "shell/config.html" $p $p.Site.Language.Lang -}}
 {{- $projectRepo := $shellConfig.projectRepo | default "" -}}
+{{- $repo := printf "%v" (site.Params.github_repo | default "") -}}
 {{- $pageOnly := dict "page" $pagePlacement "palette" true -}}
 {{- $assistantPlacements := dict
   "page" (and $pagePlacement $assistantLinks)
@@ -146,7 +150,7 @@
     "target" "blank" "placements" $assistantPlacements "options" (slice))
   (dict "id" "feed_agent" "title" $agentTitle "description" "Copy a setup prompt for Claude Code or Codex"
     "icon" "fa-solid fa-robot" "keywords" (slice $agentTitle "agent" "claude" "codex" "setup" "install" "clone" "prompt")
-    "kind" "url" "available" $assistantLinks "disabledReason" (cond $assistantLinks "" (printf "%s: %s" $agentTitle $unavailable))
+    "kind" "url" "available" (and $assistantLinks (ne $repo "")) "disabledReason" (cond (and $assistantLinks (ne $repo "")) "" (printf "%s: %s" $agentTitle $unavailable))
     "url" (cond $assistantLinks "#agent-prompt" "") "target" "self" "placements" $assistantPlacements "options" (slice))
   (dict "id" "view_markdown" "title" $viewTitle "description" $viewTitle
     "icon" "fa-brands fa-markdown" "keywords" (slice $viewTitle "markdown" "source")

@@ -106,10 +106,15 @@
   })();
 </script>
 {{- end -}}
-{{- /* Chat assistant styles (static/css/chat.css). relLangURL because GitHub
-     Pages serves this site under /CAI-Field-Manual-Hello-World/: a root-absolute
-     href would 404 there. */ -}}
-<link rel="stylesheet" href="{{ "css/chat.css" | relLangURL }}">
-{{- /* "Feed it to my AI Agent" modal styles (static/css/agent-setup.css).
-     Same relLangURL reason as the chat sheet above. */ -}}
-<link rel="stylesheet" href="{{ "css/agent-setup.css" | relLangURL }}">
+{{- /* Chat assistant styles (assets/css/chat.css). Emitted through the
+     resources pipeline: production builds minify + fingerprint it and add
+     SRI; RelPermalink keeps the site-base-path correctness the old
+     relLangURL href had (GitHub Pages serves under /CAI-Field-Manual-Hello-World/). */ -}}
+{{- $chatCss := resources.Get "css/chat.css" }}
+{{- if hugo.IsProduction }}{{ $chatCss = $chatCss | minify | fingerprint }}{{ end }}
+<link rel="stylesheet" href="{{ $chatCss.RelPermalink }}"{{ with $chatCss.Data.Integrity }} integrity="{{ . }}" crossorigin="anonymous"{{ end }}>
+{{- /* "Feed it to my AI Agent" modal styles (assets/css/agent-setup.css).
+     Same pipeline and base-path reasoning as the chat sheet above. */ -}}
+{{- $agentSetupCss := resources.Get "css/agent-setup.css" }}
+{{- if hugo.IsProduction }}{{ $agentSetupCss = $agentSetupCss | minify | fingerprint }}{{ end }}
+<link rel="stylesheet" href="{{ $agentSetupCss.RelPermalink }}"{{ with $agentSetupCss.Data.Integrity }} integrity="{{ . }}" crossorigin="anonymous"{{ end }}>

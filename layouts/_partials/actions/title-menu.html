@@ -1,3 +1,6 @@
+{{- /* Pinned copy of oink v1.4.0 layouts/_partials/actions/title-menu.html.
+     Deliberate changes: the open_gemini and feed_agent menu rows (feed_agent
+     is additionally gated on params.github_repo). Re-diff on a theme bump. */ -}}
 {{/* cSpell:ignore querify subdir */ -}}
 
 {{ $p := . -}}
@@ -110,6 +113,7 @@
       href="{{ $byID.open_gemini.url | safeURL }}" target="_blank" rel="noopener noreferrer">
       <i class="{{ $byID.open_gemini.icon }}" aria-hidden="true"></i><span>Open Gemini</span>
     </a></li>
+    {{- if and $assistantLinks (ne (printf "%v" (site.Params.github_repo | default "")) "") }}
     <li><a class="td-page-actions__item" data-td-action="feed_agent"
       href="{{ $byID.feed_agent.url | safeURL }}">
       <i class="{{ $byID.feed_agent.icon }}" aria-hidden="true"></i><span>Feed it to my AI Agent</span>
