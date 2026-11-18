@@ -113,8 +113,7 @@ Then build from the Hello-World repo root with the workspace active:
 
 ```sh
 export HUGO_MODULE_WORKSPACE=hugo.work
-hugo --cleanDestinationDir --gc --minify --environment production --printPathWarnings
-hugo --cleanDestinationDir --gc --minify --environment production --printPathWarnings 2>&1 | grep -i warn | grep -v "css.Sass: libsass"
+hugo --cleanDestinationDir --gc --minify --environment production --printPathWarnings 2>&1 | grep -E '^WARN' | grep -v "css.Sass: libsass"
 sh ../CAI-Field-Manual-Shell/scripts/check-contracts.sh
 unset HUGO_MODULE_WORKSPACE
 ```

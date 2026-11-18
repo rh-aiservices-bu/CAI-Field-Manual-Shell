@@ -31,7 +31,7 @@ Then from the Hello-World repo root:
 
 ```sh
 HUGO_MODULE_WORKSPACE=hugo.work hugo --cleanDestinationDir --gc --minify --environment production \
-  --printPathWarnings 2>&1 | grep -i warn | grep -v "css.Sass: libsass"
+  --printPathWarnings 2>&1 | grep -E '^WARN' | grep -v "css.Sass: libsass"
 ```
 
 No output = clean. Build failure or any other WARN = not done. Fix and re-run.
