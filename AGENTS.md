@@ -17,13 +17,35 @@ Note the root 404 is expected: with a path in baseURL the dev server serves at
 `http://localhost:1313/CAI-Field-Manual-prototype/`.
 
 ## Content rules
-
 - Manuals live in `content/field-manual/<manual>/`. New manual = duplicate the
   blank skeleton in `content/field-manual/hello-world/`.
 - Author doctrine: read `content/writing-the-field-manual/conventions.md` before
-  writing manual pages. Six conventions: outcome first; prerequisites stated;
-  every command followed by a verify step with literal expected output;
-  verification; rollback; known issues documented where the reader hits them.
+  writing manual pages. Six conventions: chronological information architecture
+  (field-work timeline → `1..N` chapters with `N.M` children; manual name in the
+  selector above the left nav; `h1/h2/h3` right TOC), status-gate verification
+  (every command + verify + literal expected output), inline known issues,
+  variant selector axes, customize tokens, dual consumption.
+- Nav shape (target, not yet shipped): left nav must read `1` → `N` top chapters
+  with two-level fold/unfold (`N.M`), header is `CAI Field Manual` only, manual
+  name sits in the selector directly above the tree. Levers (no pinned-file
+  edits): per-manual `sidebar_root_for: self` + `params.ui.sidebar_root_menu:
+  true` (`layouts/_partials/shell/root-menu.html:19-25` above `shell/sidebar.html:50`;
+  `sidebar-root.html:9-23` resolves per-manual root; `sidebar-root-for` semantics
+  in `sidebar-root.html`/`config.html:33-35`) and a sanctioned
+  `assets/scss/_styles_project.scss` counter fix so the per-manual root row
+  (`ul--0`, `td-shell-tree__item--root`) does not consume `1.` — e.g.
+  `& > .td-shell-tree__list:has(> .td-shell-tree__item--root){counter-reset:none}`
+  + `.td-shell-tree__item--root{counter-increment:none}` so chapters render
+  `1.` and children `1.1` (bare `counter-increment:none` alone yields `0.1` via
+  `counters(td-nav,".")`). Verify in a throwaway production build
+  (`hugo --cleanDestinationDir --gc --minify --environment production
+  --printPathWarnings`) that `::before` renders `1.` and prev/next pager still
+  roots at `FirstSection` (`layouts/_partials/pager-state.html` unchanged).
+  **Gap:** site today uses `params.ui.docs_sidebar_root: home` with whole-site
+  tree (hello-world at `list--3` → `N.M.K` via `counters()` at
+  `_styles_project.scss:187-215`); this nav is target — implement the levers
+  above before claiming `hello-world` demonstrates it (per
+  `conventions.md:8`).
 - Display options: variant blocks `{{< variant mode gitops >}}` (also
   `manual`, `scripted`) and `{{< variant version "3.4" >}}`. Option ids must
   exist in `hugo.yaml` `params.variants`. Never delete a variant block to fix a
