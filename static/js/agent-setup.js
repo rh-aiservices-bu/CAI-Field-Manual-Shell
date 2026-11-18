@@ -36,10 +36,11 @@
     "   cd " + CLONE_DIR + "\n\n" +
     "2. Read the \"Clone and render locally\" section of README.md and " +
     "follow it — prerequisites, dev server, everything it says.\n\n" +
-    "3. Read through the repository: the content in content/ (the field " +
-    "manuals, the author doctrine section, the chat page), the custom " +
-    "shortcodes and partials under layouts/, the project scripts and styles " +
-    "under static/, and the configuration in hugo.yaml and data/.\n\n" +
+    "3. Read through the repository: content/ (field manuals, doctrine,\n" +
+    "   chat, potential-improvements), data/home.yaml, hugo.yaml\n" +
+    "   (site config incl. variants/customize), .github/workflows/, plus\n" +
+    "   the Shell module for chrome (layouts, assets, static, scripts —\n" +
+    "   fetched via `hugo mod get`; see README \"Where things live\").\n\n" +
     "4. Report what this field manual can do: the manuals it contains, how " +
     "the display-option filtering and the Customize page work, the " +
     "agent-facing outputs (per-page markdown, llms.txt, print bundles), and " +

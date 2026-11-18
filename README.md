@@ -17,9 +17,6 @@ Pages deploy — the rendered site lives in the content repo.
   top level with a small-screen Home row; pager rooted at the page's own section
   instead of the site root). Re-diff all three against
   `~/go/pkg/mod/github.com/pgsty/oink@v<ver>/` on a theme bump:
-  - `layouts/docs/baseof.html`
-  - `layouts/_partials/shell/sidebar-tree.html`
-  - `layouts/_partials/pager-state.html`
 - Sanctioned extension points — not copies, free to edit (the theme ships both hooks empty):
   - `layouts/_partials/td-variant-selector.html`
   - `layouts/_partials/hooks/head-end.html` (page-top selector + pre-paint persistence runtime)
@@ -27,17 +24,12 @@ Pages deploy — the rendered site lives in the content repo.
   - `layouts/_shortcodes/customize.html` + `layouts/_shortcodes/customize-form.html`
   - `layouts/_shortcodes/variant.html`
   - `layouts/_shortcodes/feedback-demo.html`
+- Shell fixup (not upstream): `layouts/_partials/favicons.html` — hardcodes
+  Shell's known favicons so the split site still emits `<link rel="icon">`
+  tags (upstream's `os.ReadDir "static"` probe misses module `static/`).
+  Re-diff on theme bump is not needed; if you add/remove favicons in
+  `static/`, update this file to match.
 - `layouts/_partials/google_analytics.html` — GA4 partial (the theme's head.html calls it in production)
-- **Action overrides** — pinned copies of the oink v1.4.0 action files with one
-  deliberate change each: an *Open Gemini* assistant action
-  (`https://gemini.google.com/app`) registered after *Open in Claude* in the
-  page action menu and the palette, plus the *Feed it to my AI Agent* row.
-  Re-diff against `~/go/pkg/mod/github.com/pgsty/oink@v<ver>/` on a theme bump:
-  - `assets/js/action-registry.js`
-  - `assets/js/page-actions.js`
-  - `layouts/_partials/actions/context.html`
-  - `layouts/_partials/actions/title-menu.html`
-
 **Assets / static**:
 
 - `assets/icons/logo-rh-cai.svg` + `assets/scss/_styles_project.scss` (nav, header, layout)
@@ -89,9 +81,11 @@ replace github.com/rh-aiservices-bu/CAI-Field-Manual-Shell => ../CAI-Field-Manua
 Then build from the Hello-World repo root with the workspace active:
 
 ```sh
-HUGO_MODULE_WORKSPACE=hugo.work hugo --cleanDestinationDir --gc --minify --environment production --printPathWarnings
+export HUGO_MODULE_WORKSPACE=hugo.work
+hugo --cleanDestinationDir --gc --minify --environment production --printPathWarnings
 hugo --cleanDestinationDir --gc --minify --environment production --printPathWarnings 2>&1 | grep -i warn | grep -v "css.Sass: libsass"
 sh ../CAI-Field-Manual-Shell/scripts/check-contracts.sh
+unset HUGO_MODULE_WORKSPACE
 ```
 
 Verify with `hugo mod graph` and `hugo config` that the replacement is active.
