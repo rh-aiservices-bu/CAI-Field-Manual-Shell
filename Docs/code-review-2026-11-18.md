@@ -1,6 +1,6 @@
 # Code Review — CAI-Field-Manual-Shell (2026-11-18)
 
-> Scope: full working tree at `ea45b4a` (main) and then at `212b89f` (this report's prior corrected draft). Five reviewer slices were fanned out (layouts, JS, config/build, scripts/CI, security) at T+0 and were **still running at T+4m+ when this document was authored** — none had delivered a final output (verified via `proc://` and `agent://`/`history://` reads at T+4m14s). **This document is therefore a single-pass review by the integration session, not an integration of sub-agent findings.** When sub-agents deliver, their findings must be merged and explicitly attributed (or deltas noted). No behavioral changes were made.
+> Scope: full working tree at `ea45b4a` (main), then `212b89f`, then `cf351bbf` (prior corrected draft). Five reviewer slices were fanned out at T+0 (layouts, JS, config/build, scripts/CI, security). At T+4m+ none had delivered (verified via `proc://`/`agent://`/`history://` at T+4m14s) — so drafts through `cf351` were single-pass by the integration session. **SecuritySweep delivered at T+9m41s** and is integrated below; **ReviewLayouts, ReviewJS, ReviewConfigBuild, ReviewScriptsCI remain running at T+10m** — their findings are not yet merged and must be attributed when they land. No behavioral changes were made.
 
 ---
 
@@ -8,20 +8,39 @@
 
 | Severity | Count | Meaning |
 |----------|------:|---------|
-| 🟠 Medium | 11 | Should-fix, low risk to defer one cycle |
-| 🟡 Low | 7 | Polish / hygiene |
-| **Total** | **18** | |
+| 🔴 High | 1 | Fix before next release |
+| 🟠 Medium | 14 | Should-fix, low risk to defer one cycle |
+| 🟡 Low | 8 | Polish / hygiene |
+| **Total** | **23** | (plus 1 provenance note, 1 scope note — not counted) |
 
-The repo is in good shape: XSS posture is solid, shell scripts are well-commented, and the variant/customize system is unusually careful for a docs theme. Most findings are edge cases, stale docs, or hardening.
+The repo is in good shape: XSS posture is solid, shell scripts are well-commented, and the variant/customize system is unusually careful for a docs theme. Most findings are edge cases, stale docs, or hardening. One new **High** finding (H-1) has real attack value; the rest are hardening.
 
-### Corrections log (this draft)
+### Corrections log (prior drafts)
 
 - **H-1 (withdrawn in 212b89f):** `customize.html:44` `data-td-customize-default="{{ $field.default }}"`, `customize-form.html:59` `value="{{ .default }}"`, `td-variant-selector.html:26` `title="{{ .label }}"` are in `html/template` HTML-attribute context and are **auto-escaped by Go's contextual escaper**. Piping through `| htmlEscape` risks double-escaping; `hugo.yaml` `params.customize` is first-party content. Withdrawn.
 - **H-2 → M-3 (demoted in 212b89f):** `scripts/check-contracts.sh:44` `if ! grep -qE "^    - id: $axis\$" hugo.yaml` does **not** silently pass on reformat — it **loudly false-fails** (`CONTRACT variant-axis: axis '…' not declared …` per pair). Real defect is brittleness/noise, not missed validation.
 - **go 1.27.3 (withdrawn in 212b89f):** `go.mod:3` / `AGENTS.md:19` declare `go 1.27.3` — released as of 2026-11-18. Prior recommendation to downgrade to 1.22 was wrong.
-- **M-10 (withdrawn this draft):** `layouts/_partials/hooks/head-end.html:52` `html[data-td-variant-{{ $axis }}='{{ $active }}']` inside `<style>` is **CSS context** in `html/template` — the contextual escaper applies `cssValueFilter` (verified live: `'` → `\27`, `"><script>` → `\27\22\3e\3cscript\3e`). Same class as H-1; not a raw injection.
-- **L-9 (withdrawn this draft):** `markup.goldmark.renderer.unsafe` only gates raw HTML **in markdown source**; shortcode templates (`layouts/_shortcodes/*.html`) emit HTML regardless. Setting it `false` does not break variants. Prior L-9 premise was inverted.
-- **L-1 (withdrawn this draft):** `layouts/_partials/favicons.html` correctly uses `relURL` — Hugo copies `static/favicon.*` to the site root, not into per-language subdirs; `relLangURL` on non-multilingual sites behaves identically and would be unnecessary. Prior L-1 recommendation to "use `relLangURL` everywhere" was inverted.
+- **M-10 (withdrawn in cf351):** `layouts/_partials/hooks/head-end.html:52` `html[data-td-variant-{{ $axis }}='{{ $active }}']` inside `<style>` is **CSS context** in `html/template` — the contextual escaper applies `cssValueFilter` (verified live: `'` → `\27`, `"><script>` → `\27\22\3e\3cscript\3e`). Same class as H-1; not a raw injection.
+- **L-9 (withdrawn in cf351):** `markup.goldmark.renderer.unsafe` only gates raw HTML **in markdown source**; shortcode templates (`layouts/_shortcodes/*.html`) emit HTML regardless. Setting it `false` does not break variants. Prior L-9 premise was inverted.
+- **L-1 (withdrawn in cf351):** `layouts/_partials/favicons.html` correctly uses `relURL` — Hugo copies `static/favicon.*` to the site root, not into per-language subdirs; `relLangURL` on non-multilingual sites behaves identically and would be unnecessary. Prior L-1 recommendation to "use `relLangURL` everywhere" was inverted.
+
+---
+
+## 🔴 High
+
+### H-1 — CI agent workflow: any public commenter can drive a `contents: write` agent that holds a live LLM API key
+
+**Source:** SecuritySweep (delivered T+9m41s) — independently verified via `read .github/workflows/omp.yml`.
+
+**Files:** `.github/workflows/omp.yml:9-12`, `23-24`, `27-29`, `60-61`, `67-71`
+
+**Evidence:** `permissions: contents: write / issues: write / pull-requests: write` (9-12); invocation gate is only `sender.type != 'Bot' && contains(comment.body, '/omp')` (23-24); raw comment body is interpolated verbatim into the agent prompt (`COMMENT_BODY="$(gh api ... --jq .body)"` → `PROMPT` → `omp ... "$PROMPT"` at 67-71). The agent runs with `GH_TOKEN: ${{ github.token }}` (61) and `AGENT_API_KEY` in the step env (60), commits to `omp/issue-<n>` and opens PRs. On a public repo any GitHub user can author the prompt. `<comment>` delimiters are advisory — the agent is instructed to execute the request. The `Bot` filter does prevent reply-loop re-triggering (agent posts as `github-actions[bot]`), and the omp binary SHA256 pin is good — neither mitigates prompt injection or key exfiltration via tool calls.
+
+**Fix (options, in priority order):**
+1. Restrict trigger to collaborators/owners (`if: github.event.sender.type == 'User' && (github.event.comment.author_association == 'MEMBER' || … == 'OWNER' || … == 'COLLABORATOR')`), or require label/approval gate with an `environment:` protection rule before the write step.
+2. Keep `AGENT_API_KEY` out of the agent's inherited env — write it only to `models.yml`, not `env:` of the `Run omp` step that the agent's tools can read.
+3. Principle of least privilege: `contents: write` only on the final push job after human approval; earlier jobs `contents: read` + `pull-requests: write`.
+4. Drop `fetch-depth: 0` (line 29) — full history is not needed for the agent run and widens the "read the repo" exfiltration surface.
 
 ---
 
@@ -73,37 +92,67 @@ Line 26 `\{\{< customize [a-z_]+ >\}\}` and line 41 `\{\{< variant [a-z_]+ ("[^"
 
 **Fix:** add a second regex for named form or broaden to `\{\{< (customize|variant)[^>]*>\}\}` with extraction; scope the axis lookup to the `params.variants` section.
 
-### M-7 — `static/js/chat.js:739` — `innerHTML = safeMarkdown(answer)` trusts `safeMarkdown` fully
+### M-7 — `check-contracts.sh` has no freshness guard: validates whatever `public/` happens to contain
+
+**Source:** SecuritySweep — independently verified.
+
+**File:** `scripts/check-contracts.sh:60` (`find public -name index.md …`), usage comment at `:1-6` (assumes a just-built `public/`).
+
+A stale, partial, or hand-edited `public/` silently passes — CI could cache an old `public/` and print "contracts OK" without having rebuilt. `publication-gate.sh` enforces `--cleanDestinationDir`; this gate does not and is not required to run after it.
+
+**Fix:** either run `hugo --cleanDestinationDir` inside the script (like the publication gate does), or require a freshness proof (e.g. check `public/.hugo_build.lock` mtime, or accept `$BUILD_DIR` as an explicit arg and refuse if absent). At minimum, document the required invocation order in the script header.
+
+### M-8 — Missing `params.github_repo` renders a broken clone URL that defeats the single-source claim
+
+**Source:** SecuritySweep — independently verified via `read layouts/_partials/hooks/body-end.html` and `static/js/agent-setup.js`.
+
+**File:** `layouts/_partials/hooks/body-end.html:18` (`repo: "{{ printf "%s" site.Params.github_repo | strings.TrimPrefix "https://github.com/" }}"`) → consumed by `static/js/agent-setup.js:27`
+
+`hugo.yaml` in this module intentionally does not set `github_repo` — it lives in importing sites. When absent, `printf "%s" nil` renders `<no value>`, so the copy-prompt prints `git clone https://github.com/<no value>.git`. The JS fallback (`|| 'rh-aiservices-bu/…'` at agent-setup.js:27) is dead code because `__TD_AGENT_SETUP__` is always defined by the hook, just with garbage. A trailing-slash value also survives `TrimPrefix`.
+
+**Fix:** guard in the template (`{{ with site.Params.github_repo }}…{{ else }}warnf{{ end }}`), strip trailing `/`, and delete the dead JS default so the "single source (`params.github_repo`)" claim holds. The JS fallback can then be removed or turned into an explicit error.
+
+### M-9 — No security headers: no CSP, Referrer-Policy, nosniff
+
+**Source:** SecuritySweep — spot-checked in built output (`public/index.html` has no `Content-Security-Policy`/`referrer` meta).
+
+**Files:** `layouts/docs/baseof.html:7` (head assembled via `head.html` + hooks); built `public/index.html` confirms zero matches for `Content-Security-Policy|http-equiv.*referrer`.
+
+The theme emits SRI + `crossorigin` on bundled assets (good), but no `<meta http-equiv="Content-Security-Policy">` or `<meta name="referrer">`. GitHub Pages cannot set response headers, so meta is the only vehicle. This site specifically runs a BYO-endpoint chat widget that POSTs the reader's API key to an arbitrary host (`static/js/chat.js:711-721`) and fetches `?src=`-controlled same-origin paths (`chat.js:583-613`) — a `default-src 'self'; connect-src` baseline would at least bound script/frame egress (chat's open-egress is intentional, but should be documented as a CSP carve-out).
+
+**Fix:** add `<meta http-equiv="Content-Security-Policy" content="object-src 'none'; base-uri 'self'; frame-ancestors 'none'; …">` in a head hook (script-src will need `unsafe-inline` or hashes given the pre-paint bootstrap — even a partial policy is better than none) plus `<meta name="referrer" content="strict-origin-when-cross-origin">`.
+
+### M-10 — `static/js/chat.js:739` — `innerHTML = safeMarkdown(answer)` trusts `safeMarkdown` fully
 
 **File:** `static/js/chat.js:153-167`, `739`
 `safeMarkdown` is careful (escape first, placeholder fences/lists), but if LLM returns ```` ``` ```` without closing fence the regex `/```([\w+-]*)\n([\s\S]*?)```/g` fails open and subsequent `inlineMarkdown` runs inside the fence. No XSS (escaped), but can produce broken markup / layout.
 
 **Fix:** cap unclosed fences: after the main replace, if `s` still contains ```` ``` ```` wrap remainder as `<pre>`.
 
-### M-8 — `static/js/chat.js` chat completion has no timeout
+### M-11 — `static/js/chat.js` chat completion has no timeout
 
 **File:** `static/js/chat.js:728-810`
 Model-list fetch has `AbortSignal.timeout(10000)` (good), but the streaming `fetch(chatUrl…)` for completions has no timeout and `state.controller` is never timed out. A stalled gateway hangs the UI with "Thinking…" forever.
 
 **Fix:** add `AbortSignal.timeout(120_000)` or idle timer resetting on each chunk.
 
-### M-9 — `static/js/chat.js:428` `banner.innerHTML` uses static string — safe, but pattern invites future XSS
+### M-12 — `static/js/chat.js:428` `banner.innerHTML` uses static string — safe, but pattern invites future XSS
 
 **File:** `static/js/chat.js:428`
 Static HTML literal is fine, but the file already mixes `textContent` and `innerHTML`. Lint rule should enforce `textContent` + `createElement` for dynamic content.
 
 **Fix:** add eslint rule `no-inner-html` with allowlist comment.
 
-### M-10 — `assets/js/action-registry.js:128-140` markdown fetch cache never invalidates
+### M-13 — `assets/js/action-registry.js:128-140` markdown fetch cache never invalidates
 
 **File:** `assets/js/action-registry.js:128-140`
 `markdown` Map caches `fetchMarkdown(url)` forever. After navigating to a new page the old page's markdown is served incorrectly (key is URL, so cross-page is actually correct), but after content update without reload it is stale until tab close.
 
 **Fix:** add TTL or `invalidateMarkdown()` on `visibilitychange`; document expected staleness.
 
-### M-11 — `.github/workflows/omp.yml:23` `contains(body, '/omp')` is substring match
+### M-14 — `.github/workflows/omp.yml:24` `contains(body, '/omp')` is substring match
 
-A comment containing code like `` `npm run /ompile` `` triggers the agent. Low probability but wastes minutes and posts noise.
+A comment containing code like `` `npm run /ompile` `` triggers the agent. Low probability but wastes minutes and posts noise. (Distinct from H-1's prompt-injection issue — this is the cheap false-trigger even for legitimate users.)
 
 **Fix:** `contains(github.event.comment.body, '/omp ') || startsWith(..., '/omp')` or regex `/(^|\n)\/omp(\s|$)/`.
 
@@ -121,7 +170,7 @@ Intentional for UX, but shows in page source / screenshots. Could be opt-in or s
 
 ### L-3 — `static/js/agent-setup.js:27` fallback repo literal is hardcoded
 
-`REPO` fallback `'rh-aiservices-bu/CAI-Field-Manual-Hello-World'` will drift if the org renames the content repo. Prefer failing visibly (`No github_repo configured`) over silently cloning the wrong repo.
+`REPO` fallback `'rh-aiservices-bu/CAI-Field-Manual-Hello-World'` will drift if the org renames the content repo. Now compounded by M-8: prefer failing visibly (`No github_repo configured`) over silently cloning the wrong repo.
 
 ### L-4 — `Docs/` contains stale review docs referencing old repo name
 
@@ -145,34 +194,46 @@ Shell scripts and 1.4 kLOC of JS have no lint step. `check-contracts.sh` has SC2
 
 `agent-setup.css:14-17` `color-mix(... 30%, transparent)` and `backdrop-filter: blur(2px)` are not supported in older Firefox ESR. Graceful degradation (solid overlay) is fine, but add a `@supports` fallback comment for future maintainers.
 
-### L-9 — ReviewJS diffed against wrong upstream version (observed; not a code defect)
+---
 
-The `ReviewJS` sub-agent's transcript (e.g. history at `ReviewJS.jsonl` line ~60-65) diffed the pinned `assets/js/action-registry.js` / `page-actions.js` against the Hugo cache entry for **`oink@v1.5.1`**, while `go.mod:5` pins **`v1.4.0`** (and `AGENTS.md:39` mandates re-diffing against `~/go/pkg/mod/github.com/pgsty/oink@v1.4.0/`). Any "diverged from upstream" findings from that diff are artifacts of the wrong baseline and must be discarded when integrating that slice. This is a review-provenance note, not a code defect.
+### Attribution & deferred findings
+
+### Note — SecuritySweep: findings adopted, one demoted
+
+- **SecuritySweep M2 (not adopted as written):** "Config strings interpolated raw into `<style>` and `<script type=\"application/json\">`" — axis/option ids and status phrases emitted via `{{ $axis }}` in `<style>` and `{{ $blob | jsonify | safeJS }}` in `application/json`. The report claimed Hugo `jsonify` does not escape `<`/`/` so `</script>` breaks out, and axis ids inject CSS. Re-checked: `<style>` content is **CSS context** in `html/template` (verified live in prior draft via `go run` — `'` → `\27`, `"><script>` → CSS-escaped), not raw; and Hugo's `jsonify` (backed by `encoding/json` with `SetEscapeHTML(true)`) emits `<` as `\u003c`, so `</script>` cannot terminate the JSON element. Site params are **first-party trusted config** (content-repo maintainers), not an XSS boundary. Demoted to defense-in-depth: constraining ids at validation time (`head-end.html:18-36` already warns on bad axes) is good hygiene — keep it as a Low, not a Medium. No change to the report beyond this note.
+- **SecuritySweep M3 freshness gap** merged into **M-7** above; its additional note about unquoted `for md in $manual_mds` and `sed` over-matching `params.customize: { id: … }`-style variant options is valid and is covered by **M-4** (word-splitting) and **M-3** (scope axis lookup to `params.variants`).
+- **SecuritySweep L1-L8:** L1 (LICENSE/SECURITY.md/Dependabot, stale `publication-gate.sh:9` comment referencing non-existent `github-pages.yaml`) is valid hygiene — left as L-6 note to add supply-chain docs. L2 (GA4 `cookie_flags`) is valid but below the report's current Low bar; L3 (agent-setup clipboard `.catch`), L4 (`isLocalHostname` misses `.home.arpa`/ULA), L5 (customize over-match), L7 (minor `curl --fail`, `rel="noopener"` vs `noreferrer`) are noted and may be promoted when the layout/JS slices land. None are dropped.
 
 ### Note — `public/` / `resources/_gen/` scope (not a finding)
 
-`public/` is **gitignored** (`/.gitignore:1`) and **untracked** (verified: `git ls-files public/` → empty) and `resources/_gen/` is similarly untracked build output. The reviewer prompts were scoped to `layouts/`, `assets/`, `static/`, `scripts/`, `hugo.yaml`, `go.mod`, `.github/`, `Docs/` — no stale `public/` or `resources/` issues were reported by sub-agents, and none were added here.
+`public/` is **gitignored** (`/.gitignore:1`) and **untracked** (verified: `git ls-files public/` → empty) and `resources/_gen/` is similarly untracked build output. The reviewer prompts were scoped to `layouts/`, `assets/`, `static/`, `scripts/`, `hugo.yaml`, `go.mod`, `.github/`, `Docs/` — no stale `public/` or `resources/` issues were reported by SecuritySweep (see its Verified Clean: Supply-chain/governance), and none are added here.
+
+### Note — ReviewJS diffed against wrong upstream version (observed; not a code defect)
+
+The `ReviewJS` sub-agent's transcript (e.g. history at `ReviewJS.jsonl` line ~60-65) diffed the pinned `assets/js/action-registry.js` / `page-actions.js` against the Hugo cache entry for **`oink@v1.5.1`**, while `go.mod:5` pins **`v1.4.0`** (and `AGENTS.md:39` mandates re-diffing against `~/go/pkg/mod/github.com/pgsty/oink@v1.4.0/`). Any "diverged from upstream" findings from that diff are artifacts of the wrong baseline and must be discarded when integrating that slice. This is a review-provenance note, not a code defect.
 
 ---
 
 ## Positive notes (keep)
 
-- `safeUrl()` allowlist (`http:`/`https:` only, rejects `//`, `\`) is correct and consistently applied.
+- `safeUrl()` allowlist (`http:`/`https:` only, rejects `//`, `\`) is correct and consistently applied — SecuritySweep independently verified every `| safeURL` site in `title-menu.html` passes through `content/url.html` validation.
 - `action-registry.js` freezing descriptors and rejecting non-builtin `kind` prevents site-config JS injection — strong design.
 - `td-variant-selector` inline JS correctly falls back to config `default` for unknown stored ids and sweeps stale keys — rare to see done right.
-- `chat.js` `Local Network Access` diagnostic in `formatFetchError` is genuinely helpful; keep it.
+- `chat.js` `Local Network Access` diagnostic in `formatFetchError` is genuinely helpful; keep it (SecuritySweep flagged its `isLocalHostname` as slightly narrow — true, but the current version handles the common cases).
 - `agent-setup.js` dialog focus restore + `Esc` `stopPropagation` avoids double-close with page-actions menu — careful.
 - Publication gate + contract checks are well split (gate = build must pass; contracts = content promises).
+- **SecuritySweep verified clean:** no secrets in tracked files/history/`public/` (only public GA ID `G-7ZXCS2MF1D`); SRI + `crossorigin` on bundled assets present; `safeMarkdown` escapes first then transforms — correct order; no tracked large binaries; stale `public/`/`resources/` untracked and harmless.
 
 ---
 
 ## Recommended next steps (priority order)
 
-1. **Harden `check-contracts.sh` contracts** (M-3/M-4/M-5/M-6) — derive variant labels from `hugo.yaml` and assert them; add named-param coverage; fix YAML + shell brittleness.
-2. **Add `pipefail` to `publication-gate.sh`** (M-1) + lint step to CI (L-6) — prevents silent green on corrupted gate log.
-3. **Add chat completion timeout** (M-8) — user-visible hang.
-4. **Archive/update `Docs/`** (L-4) and add `public/` clean-up note if desired.
+1. **Harden CI trust boundary** (H-1) — restrict `omp` trigger to collaborators and split `contents: write` to an approval-gated job; move `AGENT_API_KEY` out of the agent's env.
+2. **Harden `check-contracts.sh` contracts** (M-3/M-4/M-5/M-6/M-7/M-8) — derive variant labels from `hugo.yaml` and assert them; add named-param coverage; add freshness guard; scope lookups to `params.variants`; fix YAML + shell brittleness.
+3. **Add `pipefail` to `publication-gate.sh`** (M-1) + lint step to CI (L-6) — prevents silent green on corrupted gate log.
+4. **Add chat completion timeout** (M-11) + CSP/referrer meta (M-9) — user-visible hang + cheap defense-in-depth.
+5. **Archive/update `Docs/`** (L-4).
 
 ---
 
-*Revised single-pass review: working tree at `212b89f`; prior draft was at `ea45b4a`. Five reviewer slices fanned at T+0, still running at T+4m+ with no delivered output, so findings are from the integration session only. This draft withdraws M-10/L-9/L-1 as same-class false positives (Go `html/template` CSS-context escaper; `renderer.unsafe` governs markdown source only; `static/` serves from site root) verified by live `go run` test and Hugo semantics, and adds the contracts defects (hardcoded labels + unused `labels` count; positional-only shortcode regex). Sub-agent findings must be merged and attributed when they land.*
+*Revised single-pass review + SecuritySweep integration: working tree at `cf351bbf`; prior drafts at `ea45b4a` → `212b89f`. SecuritySweep delivered at T+9m41s and is attributed above; four reviewer slices (ReviewLayouts, ReviewJS, ReviewConfigBuild, ReviewScriptsCI) remain running at T+10m — their findings must be merged and attributed when they land. Withdrawals: M-10/L-9/L-1 as same-class false positives (Go `html/template` CSS-context escaper; `renderer.unsafe` governs markdown source only; `static/` serves from site root) verified by live `go run` test and Hugo semantics; additions: contracts defects (hardcoded labels + unused count; positional-only shortcode regex; freshness gap; missing `github_repo` guard) and CI/CSP findings from SecuritySweep.*
