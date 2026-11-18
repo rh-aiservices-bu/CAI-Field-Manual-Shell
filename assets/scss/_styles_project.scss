@@ -197,8 +197,11 @@ code.td-customize-token {
     counter-reset: td-nav;
   }
 
-  // Guarded self-root cover: only the tree containing a sidebar_root_for:self
-  // section suppresses its outer list counter, so Home 1..N is untouched.
+  // Guard for the explicit-navigation tree only: when docs-sidebar-tree.html
+  // (data/docs_nav.json path) promotes a cover into a td-shell-tree__item--root
+  // row, suppress the outer counter so chapter numbering starts at 1. The content-tree
+  // walker (shell/sidebar-tree.html) no longer emits a ul--0/--root cover row
+  // for Home or self-root covers (children render at ul--1), so this guard is a no-op there.
   & > .td-shell-tree__list:has(> .td-shell-tree__item--root) {
     counter-reset: none;
   }

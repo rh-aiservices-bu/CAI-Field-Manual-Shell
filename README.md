@@ -25,8 +25,7 @@ Pages deploy — the rendered site lives in the content repo.
 - Pinned oink v1.4.0 overrides — layout/html files carry provenance comments
   naming their deliberate changes. Re-diff all eight against
   `~/go/pkg/mod/github.com/pgsty/oink@v<ver>/` on a theme bump:
-  - `layouts/docs/baseof.html` — page-top selector call before version banner
-  - `layouts/_partials/shell/sidebar-tree.html` — Home + `sidebar_root_for: self` promoted to tree's top level with small-screen cover row
+  - `layouts/_partials/shell/sidebar-tree.html` — Home + `sidebar_root_for: self` promoted to tree's top level (`ul--1`/`ulNr 1`); small-screen `d-md-none` cover row is `IsHome`-only (self-roots already have the always-visible `td-shell-root--static` selector in the header)
   - `layouts/_partials/pager-state.html` — pager rooted at the page's own section
   - `layouts/_partials/head-css.html` — switches to `transpiler: dartsass` (silences oink/Bootstrap `libSass` `@import` deprecations), fixes RTL `Integrity` scoping
   - `layouts/_partials/actions/context.html` — open_gemini + feed_agent rows (feed_agent gated on `params.github_repo`)
