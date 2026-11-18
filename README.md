@@ -22,8 +22,8 @@ Pages deploy — the rendered site lives in the content repo.
 
 **Layout overrides** (Hugo mounts merge these into the importing site):
 
-- Pinned copies of oink v1.4.0 files — each headed by a provenance comment naming
-  its deliberate changes. Re-diff all eight against
+- Pinned oink v1.4.0 overrides — layout/html files carry provenance comments
+  naming their deliberate changes. Re-diff all eight against
   `~/go/pkg/mod/github.com/pgsty/oink@v<ver>/` on a theme bump:
   - `layouts/docs/baseof.html` — page-top selector call before version banner
   - `layouts/_partials/shell/sidebar-tree.html` — Home + `sidebar_root_for: self` promoted to tree's top level with small-screen cover row
@@ -31,8 +31,8 @@ Pages deploy — the rendered site lives in the content repo.
   - `layouts/_partials/head-css.html` — switches to `transpiler: dartsass` (silences oink/Bootstrap `libSass` `@import` deprecations), fixes RTL `Integrity` scoping
   - `layouts/_partials/actions/context.html` — open_gemini + feed_agent rows (feed_agent gated on `params.github_repo`)
   - `layouts/_partials/actions/title-menu.html` — open_gemini + feed_agent rows (feed_agent gated on `params.github_repo`)
-  - `assets/js/action-registry.js` — open_gemini + feed_agent action kinds
-  - `assets/js/page-actions.js` — open_gemini + feed_agent bindings
+  - `assets/js/action-registry.js` — open_gemini + feed_agent action kinds *(pinned, no provenance header)*
+  - `assets/js/page-actions.js` — open_gemini + feed_agent bindings *(pinned, no provenance header)*
 - Sanctioned extension points — not copies, free to edit (the theme ships both hooks empty):
   - `layouts/_partials/td-variant-selector.html`
   - `layouts/_partials/hooks/head-end.html` (page-top selector + pre-paint persistence runtime)
@@ -66,22 +66,24 @@ Pages deploy — the rendered site lives in the content repo.
 module:
   imports:
     - path: github.com/rh-aiservices-bu/CAI-Field-Manual-Shell
+      # Pinned to Shell commit 4968e45a45d7 on main; bump by editing this hash.
       version: 4968e45a45d7
   hugoVersion:
     extended: true
     min: 0.168.0
 ```
 
-Update the shell:
+Update the shell — pin a specific commit, don't float to latest:
 
 ```sh
-hugo mod get github.com/rh-aiservices-bu/CAI-Field-Manual-Shell
+# 1) bump the pin in content repo's hugo.yaml (version: <sha>)
+hugo mod get github.com/rh-aiservices-bu/CAI-Field-Manual-Shell@<sha>
 hugo mod tidy
-# or pin a specific commit:
-# hugo mod get github.com/rh-aiservices-bu/CAI-Field-Manual-Shell@<sha>
 ```
 
-Then verify `hugo mod graph` still shows `github.com/pgsty/oink v1.4.0` (the pinned theme); do not use `-u` here — it upgrades transitive deps.
+Verify `hugo mod graph` still shows `github.com/pgsty/oink v1.4.0` and that
+`hugo.yaml:version` matches the `go.mod`/`go.sum` hash. Do not use `-u`
+here — it upgrades transitive deps.
 
 Content repo CI must install Dart Sass before the publication gate (see content repo's `.github/workflows/github-pages.yaml` — both `build` and `pr-gate` jobs):
 

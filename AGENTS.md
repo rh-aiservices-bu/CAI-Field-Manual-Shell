@@ -37,8 +37,11 @@ HUGO_MODULE_WORKSPACE=hugo.work hugo --cleanDestinationDir --gc --minify --envir
 No output = clean. Build failure or any other WARN = not done. Fix and re-run.
 `hugo.work` is gitignored — never commit it.
 
-Changes to `scripts/publication-gate.sh` or `scripts/check-contracts.sh`
-themselves are validated by Hello-World's build (which runs the updated scripts).
+Changes to `scripts/publication-gate.sh` itself are validated by Hello-World's
+build (which runs the updated shell scripts). `scripts/check-contracts.sh` is a
+local-only gate: run it manually after the build
+(`sh ../CAI-Field-Manual-Shell/scripts/check-contracts.sh`); Hello-World CI
+does not call it.
 
 Content repo CI installs Dart Sass before the gate (both `build` and `pr-gate`
 jobs in `.github/workflows/github-pages.yaml`); locally, `sass --version`
@@ -46,13 +49,21 @@ must succeed first.
 
 ## Do not touch without re-diffing
 
-Files under `layouts/` and `assets/js/` marked as pinned oink v1.4.0 copies
-(`layouts/docs/baseof.html`, `layouts/_partials/shell/sidebar-tree.html`,
-`layouts/_partials/pager-state.html`, `layouts/_partials/head-css.html`,
-`assets/js/action-registry.js`, `assets/js/page-actions.js`,
-`layouts/_partials/actions/context.html`, `layouts/_partials/actions/title-menu.html`)
-each carry a provenance comment naming its deliberate changes. Any edit beyond
-those changes requires re-diffing against `~/go/pkg/mod/github.com/pgsty/oink@v1.4.0/`.
+These oink v1.4.0 overrides carry provenance comments naming their deliberate
+changes; any other edit requires re-diffing against
+`~/go/pkg/mod/github.com/pgsty/oink@v1.4.0/`:
+
+- `layouts/docs/baseof.html`
+- `layouts/_partials/shell/sidebar-tree.html`
+- `layouts/_partials/pager-state.html`
+- `layouts/_partials/head-css.html`
+- `layouts/_partials/actions/context.html`
+- `layouts/_partials/actions/title-menu.html`
+
+Two more JS files are pinned oink v1.4.0 copies **without** provenance headers
+(`grep` for `Pinned copy` misses them): `assets/js/action-registry.js` and
+`assets/js/page-actions.js`. Treat them the same — only the listed Gemini/
+agent additions are allowed.
 
 The Dart Sass overlay `assets/scss/td/_chroma.scss` + `assets/scss/td/chroma/_dark-wrapped.scss`
 is paired with `head-css.html` — do not change one without the other; both are
@@ -60,7 +71,8 @@ removed together when upstream migrates to `@use`.
 
 Sanctioned extension points (free to edit): `td-variant-selector.html`,
 `hooks/head-end.html`, `hooks/body-end.html`, the customize shortcodes,
-`assets/js/`, `assets/css/`, `hugo.yaml`, `assets/scss/_styles_project.scss`.
+`assets/js/agent-setup.js`, `assets/js/chat.js`, `assets/css/`, `hugo.yaml`,
+`assets/scss/_styles_project.scss`.
 
 ## Verification for JS changes
 
