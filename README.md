@@ -93,15 +93,6 @@ unset HUGO_MODULE_WORKSPACE
 Verify with `hugo mod graph` and `hugo config` that the replacement is active.
 `hugo.work` is gitignored — never commit it.
 
-## omp agent (CI)
-
-The repo runs an [omp](https://omp.sh)-based coding agent via
-`.github/workflows/omp.yml`. Comment `/omp <request>` on any issue or PR
-review thread to invoke it; it reads this file and README.md, and opens a
-draft PR from a branch `omp/issue-<n>` for any change. Configuration is three
-repo-level settings — `AGENT_BASE_URL` (variable), `AGENT_MODEL` (variable),
-`AGENT_API_KEY` (secret) — never in files.
-
 ## Disclaimers
 
 - **Orientation, not a support statement.** Commands and versions reflect
