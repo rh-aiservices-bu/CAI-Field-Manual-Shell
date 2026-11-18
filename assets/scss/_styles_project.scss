@@ -197,11 +197,25 @@ code.td-customize-token {
     counter-reset: td-nav;
   }
 
-  .td-shell-tree__item:not(.d-md-none):not(.td-shell-tree__heading) {
+  // Guarded self-root cover: only the tree containing a sidebar_root_for:self
+  // section suppresses its outer list counter, so Home 1..N is untouched.
+  & > .td-shell-tree__list:has(> .td-shell-tree__item--root) {
+    counter-reset: none;
+  }
+
+  .td-shell-tree__item:not(.d-md-none):not(.td-shell-tree__heading):not(.td-shell-tree__item--root) {
     counter-increment: td-nav;
 
     & > .td-shell-tree__row > .td-shell-tree__link > span::before {
       content: counters(td-nav, ".") " ";
+    }
+  }
+
+  .td-shell-tree__item--root {
+    counter-increment: none;
+
+    & > .td-shell-tree__row > .td-shell-tree__link > span::before {
+      content: none;
     }
   }
 

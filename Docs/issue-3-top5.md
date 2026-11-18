@@ -1,5 +1,6 @@
 # Top 5 next moves for the field manuals (issue #3 follow-up)
 
+> Written 2026-11-07 against the pre-split prototype (content/, data/, prototype naming). After 70d5c48 those files live in CAI-Field-Manual-Hello-World; the scripts here are validated from that repo (see AGENTS.md).
 
 The prototype's stated goals: chronological field-work notes (set up → operate → things that broke), every command status-gated with literal expected output, known issues documented where the reader hits them, divergence routed through the page-top selector axes, environment-specific values as customize tokens, and one page serving both a human in a browser and an agent reading markdown. The first review (findings 1–6 below the fold of this doc's PR) covered gaps inside the hello-world exemplar. This doc is the next layer: what to build so the format survives contact with real manuals, real drift, and real readers.
 

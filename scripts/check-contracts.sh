@@ -109,7 +109,39 @@ for pair in $(printf '%s' "$stream" | grep -ohE '\{\{[<%] *variant +[a-z_]+ +("[
         esac
     done
 done
-manual_mds=$(find public -name index.md -path "*/field-manual/*")
+
+# 3. every source variant block surfaces exactly one label line ----------------
+# Discovery: iterate every public/**/index.md that has a content/** counterpart
+# (leaf bundle content/<p>/index.md → public/<p>/index.md, plain page
+# content/<p>.md → public/<p>/index.md, section _index.md → public/<p>/index.md).
+# The site home public/index.md is excluded. docs_section is kept only for the
+# LLMS bundle existence check.
+manual_mds=""
+for _md in $(find public -name index.md | LC_ALL=C sort); do
+  [ "$_md" = "public/index.md" ] && continue
+  _src="content/${_md#public/}"
+  if [ ! -f "$_src" ]; then
+    _plain=${_src%/index.md}.md
+    [ -f "$_plain" ] && _src=$_plain
+  fi
+  if [ ! -f "$_src" ]; then
+    _sec_src="${_md#public/}"; _sec_src="content/${_sec_src%index.md}_index.md"
+    [ -f "$_sec_src" ] && _src=$_sec_src
+  fi
+  [ -f "$_src" ] || continue
+  manual_mds="${manual_mds} ${_md}"
+done
+
+# Derived label alternation from hugo.yaml's variants block (replaces the
+# hardcoded RHAIE Version|Ops Mode pair): every `label:` line under
+# `variants:` becomes one ERE alternative, escaped for ERE. Flow-map option
+# lines that the label sed cannot reduce pass through verbatim; as escaped
+# ERE alternatives they can only match their own literal text, never the
+# emitted "**Axis: Option**" shape, so they are inert. The count assertion
+# below is load-bearing: variant blocks in source must equal label lines in
+# the built page.
+labels_list=$(sed -n '/^  variants:/,/^[[:graph:]]/p' hugo.yaml | grep -E 'label:' | sed -E "s/^[[:space:]]*(- \{ )?label:[[:space:]]*['\"]?([^'\"}]+)['\"]?[,} ]*/\2/" | sort -u)
+labels_re=$(printf '%s\n' "$labels_list" | sed -E 's/[^[:alnum:] _-]/\\&/g' | paste -s -d '|' -)
 for md in $manual_mds; do
     # Map the built page back to its source, trying, in order: the leaf
     # bundle (content/<path>/index.md), the plain page

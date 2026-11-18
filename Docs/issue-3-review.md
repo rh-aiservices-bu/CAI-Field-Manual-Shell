@@ -1,5 +1,7 @@
 # Review — CAI Field Manual prototype (issue #3)
 
+> Written 2026-11-07 against the pre-split prototype (content/, data/, prototype naming). After 70d5c48 those files live in CAI-Field-Manual-Hello-World; the scripts here are validated from that repo (see AGENTS.md).
+
 **Verdict:** the skeleton delivers its six conventions; the gate is clean (only the known LibSass warning; verified with hugo v0.169.0+extended). The doctrine pages are the strongest part. Findings below are content gaps inside the exemplar itself, ranked.
 
 ## What works (verified)

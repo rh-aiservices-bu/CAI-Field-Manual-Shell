@@ -6,7 +6,7 @@
      The script guards itself: with no #td-chat mount it only installs the
      Chat-link source forwarding, so print bundles and every other page stay
      inert. */ -}}
-<script>window.__TD_CHAT__ = { llmsFull: "{{ "field-manual/llms-full.txt" | relLangURL }}" };</script>
+<script>window.__TD_CHAT__ = { llmsFull: "{{ print site.Params.ui.docs_section `/llms-full.txt` | relLangURL }}" };</script>
 {{- $chatJs := resources.Get "js/chat.js" }}
 {{- if hugo.IsProduction }}{{ $chatJs = $chatJs | minify | fingerprint }}{{ end }}
 <script src="{{ $chatJs.RelPermalink }}" defer></script>

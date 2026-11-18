@@ -1,4 +1,4 @@
-/* Chat assistant (content/chat/_index.md, static/js/chat.js).
+/* Chat assistant (content/chat/_index.md, assets/js/chat.js).
  *
  * Styles the widget mount only: the widget renders every child. Theme
  * variables throughout so dark mode follows html[data-bs-theme] (Bootstrap

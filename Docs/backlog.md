@@ -18,7 +18,7 @@ Working list of pending work for this repo. New items go at the bottom of their 
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
-| | | | |
+| 1 | All images visible in the rendered view have a 1px visible outline | pending | CSS in assets/scss/_styles_project.scss (sanctioned extension point); scope: rendered content images (e.g. .td-content img), not chrome marks (nav logo, sidebar brand, icons); 1px solid using a theme border/ink token so it stays visible across paper/slate/ink/terminal presets and dark mode; verify via Hello-World hugo.work build + browser |
 
 ## Done
 

@@ -1,5 +1,7 @@
 # MaaS Guide Review — approach, questions, divergence slots
 
+> Scouted 2026-10-30 against the pre-split prototype (content/, data/, prototype naming). After 70d5c48 those files live in CAI-Field-Manual-Hello-World; the scripts here are validated from that repo (see AGENTS.md).
+
 **Source:** [rhoai-maas-guide](https://rh-aiservices-bu.github.io/rhoai-maas-guide/modules/main/index.html) — scouted 2026-10-30 (14 pages, sitemap.xml, 404.html, changelog, raw HTML head/nav).
 **Local site:** CAI-Field-Manual-prototype — Hugo + oink, one exemplar section, one sample page.
 **Purpose of this doc:** what the MaaS guide does, which traits are worth emulating here, open questions, and blank slots for deliberate divergences. Answer inline in §4/§5 or in chat.

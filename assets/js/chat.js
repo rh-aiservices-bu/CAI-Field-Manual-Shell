@@ -27,7 +27,6 @@
   var CONTEXT_CAP = 30000;
   var TRUNCATED_NOTE = '\n\n[document truncated]';
   var MASK = '••••••••';
-  var PREVIEW_LEN = 6;
 
   var ASSISTANT_NAME = 'CAIssistant';
 
@@ -81,13 +80,10 @@
   }
 
   function previewKey(value) {
-    if (value.length > PREVIEW_LEN) {
-      // JWT-shaped tokens start with the constant base64 header 'eyJ'; showing
-      // it leaks nothing, while a longer prefix of an opaque key might.
-      var prefix = value.slice(0, PREVIEW_LEN);
-      return (value.charAt(0) === 'e' && value.charAt(1) === 'y' && value.charAt(2) === 'J'
-        ? 'eyJ…'
-        : prefix) + MASK;
+    // JWT-shaped tokens start with the constant base64 header 'eyJ'; showing
+    // it leaks nothing, while any prefix of an opaque key might.
+    if (value.charAt(0) === 'e' && value.charAt(1) === 'y' && value.charAt(2) === 'J') {
+      return 'eyJ…' + MASK;
     }
     return MASK;
   }
@@ -605,8 +601,13 @@
       // a source path without a trailing slash carries <path>.md instead.
       var pagePath = raw;
       try { pagePath = decodeURIComponent(raw); } catch (e) { /* keep raw */ }
-      var source = pagePath + (/\/$/.test(pagePath) ? 'index.md' : '.md');
+      // src is user-controlled: only same-origin manual pages may be fetched —
+      // the same path shape isChatPath accepts, at most six segments deep.
       var label = humanizeSegment(pagePath);
+      var u; try { u = new URL(pagePath, location.href); } catch (e) { contextFailed(label, new Error('src is not a valid path')); return; }
+      if (u.origin !== location.origin || !/^\/(?:[\w@:%-]+~)?[\w.-]+(?:\/[\w@.%-]+)*\/$/.test(u.pathname) || u.pathname.slice(1).split('/').length > 6) { contextFailed(label, new Error('cross-origin src rejected')); return; }
+      pagePath = u.pathname;
+      var source = pagePath + (/\/$/.test(pagePath) ? 'index.md' : '.md');
       state.contextLabel = label;
       renderContext();
 
