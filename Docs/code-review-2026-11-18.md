@@ -1,6 +1,6 @@
 # Code Review — CAI-Field-Manual-Shell (2026-11-18)
 
-> Scope: full working tree at `ea45b4a` (main), then `212b89f`, then `cf351bbf`, then `03d91b0` (prior integrated draft). Five reviewer slices were fanned out at T+0 (layouts, JS, config/build, scripts/CI, security). At T+4m+ none had delivered (verified at T+4m14s). **SecuritySweep delivered at T+9m41s** and was integrated in `03d91b0`; **ReviewConfigBuild delivered at T+15m50s** and is integrated below; **ReviewLayouts, ReviewJS, ReviewScriptsCI remain running at T+16m** — their findings must be merged and attributed when they land. No behavioral changes were made.
+> Scope: full working tree at `ea45b4a` (main), then `212b89f`, `cf351bbf`, `03d91b0`, `a2515d6` (prior integrated drafts). Five reviewer slices were fanned at T+0 (layouts, JS, config/build, scripts/CI, security). At T+4m+ none had delivered (verified at T+4m14s). **SecuritySweep delivered at T+9m41s** and **ReviewConfigBuild at T+15m50s** — both integrated. **ReviewScriptsCI delivered at T+17m29s** and is integrated below; **ReviewLayouts, ReviewJS remain running at T+17m** — their findings must be merged and attributed when they land. No behavioral changes were made.
 
 ---
 
@@ -8,17 +8,17 @@
 
 | Severity | Count | Meaning |
 |----------|------:|---------|
-| 🔴 High | 1 | Fix before next release |
-| 🟠 Medium | 17 | Should-fix, low risk to defer one cycle |
-| 🟡 Low | 13 | Polish / hygiene |
-| **Total** | **31** | (plus attribution/provenance notes — not counted) |
+| 🔴 High | 2 | Fix before next release |
+| 🟠 Medium | 21 | Should-fix, low risk to defer one cycle |
+| 🟡 Low | 18 | Polish / hygiene |
+| **Total** | **41** | (plus attribution/provenance notes — not counted) |
 
-The repo is in good shape: XSS posture is solid, shell scripts are well-commented, and the variant/customize system is unusually careful for a docs theme. Most findings are edge cases, stale docs, or hardening. One **High** (H-1) has real attack value; the rest are hardening.
+The repo is in good shape: XSS posture is solid, shell scripts are well-commented, and the variant/customize system is unusually careful for a docs theme. Most findings are edge cases, stale docs, or hardening. Two **High** findings (H-1 CI trust boundary; H-2 contract-sweep `_print` + CWD holes) have real impact.
 
 ### Corrections log (prior drafts)
 
 - **Attribute-escaping finding (withdrawn in 212b89f):** `customize.html:44` `data-td-customize-default="{{ $field.default }}"`, `customize-form.html:59` `value="{{ .default }}"`, `td-variant-selector.html:26` `title="{{ .label }}"` are in `html/template` HTML-attribute context and are **auto-escaped by Go's contextual escaper**. Piping through `| htmlEscape` risks double-escaping; `hugo.yaml` `params.customize` is first-party content. Withdrawn as a High (ID not re-used; the current H-1 is the CI trust-boundary finding).
-- **`hugo.yaml` YAML-parsing finding (demoted in 212b89f):** `scripts/check-contracts.sh:44` `if ! grep -qE "^    - id: $axis\$" hugo.yaml` does **not** silently pass on reformat — it **loudly false-fails** (`CONTRACT variant-axis: axis '…' not declared …` per pair). Real defect is brittleness/noise, not missed validation. Demoted to Medium (M-6).
+- **`hugo.yaml` YAML-parsing finding (demoted in 212b89f):** `scripts/check-contracts.sh:44` `if ! grep -qE "^    - id: $axis\$" hugo.yaml` does **not** silently pass on reformat — it **loudly false-fails** (`CONTRACT variant-axis: axis '…' not declared …` per pair). Real defect is brittleness/noise, not missed validation. Demoted to Medium (M-10).
 - **`go 1.27.3` finding (withdrawn in 212b89f):** `go.mod:3` / `AGENTS.md:19` declare `go 1.27.3` — released as of 2026-11-18. Prior recommendation to downgrade to 1.22 was wrong.
 - **CSS-in-`<style>` finding (withdrawn in cf351):** `layouts/_partials/hooks/head-end.html:52` `html[data-td-variant-{{ $axis }}='{{ $active }}']` inside `<style>` is **CSS context** in `html/template` — the contextual escaper applies `cssValueFilter` (verified live: `'` → `\27`, `"><script>` → `\27\22\3e\3cscript\3e`). Same class as the attribute-escaping finding; not a raw injection.
 - **`renderer.unsafe` finding (withdrawn in cf351):** `markup.goldmark.renderer.unsafe` only gates raw HTML **in markdown source**; shortcode templates (`layouts/_shortcodes/*.html`) emit HTML regardless. Setting it `false` does not break variants. Prior premise was inverted.
@@ -30,17 +30,33 @@ The repo is in good shape: XSS posture is solid, shell scripts are well-commente
 
 ### H-1 — CI agent workflow: any public commenter can drive a `contents: write` agent that holds a live LLM API key
 
-**Source:** SecuritySweep (T+9m41s) — independently verified via `read .github/workflows/omp.yml`.
+**Source:** SecuritySweep (T+9m41s) — independently verified via `read .github/workflows/omp.yml`. Reinforced by ReviewScriptsCI C2/C3.
 
 **Files:** `.github/workflows/omp.yml:9-12`, `23-24`, `27-29`, `60-61`, `67-71`
 
-**Evidence:** `permissions: contents: write / issues: write / pull-requests: write` (9-12); invocation gate is only `sender.type != 'Bot' && contains(comment.body, '/omp')` (23-24); raw comment body is interpolated verbatim into the agent prompt (`COMMENT_BODY="$(gh api ... --jq .body)"` → `PROMPT` → `omp ... "$PROMPT"` at 67-71). The agent runs with `GH_TOKEN: ${{ github.token }}` (61) and `AGENT_API_KEY` in the step env (60), commits to `omp/issue-<n>` and opens PRs. On a public repo any GitHub user can author the prompt. `<comment>` delimiters are advisory — the agent is instructed to execute the request. The `Bot` filter does prevent reply-loop re-triggering (agent posts as `github-actions[bot]`), and the omp binary SHA256 pin is good — neither mitigates prompt injection or key exfiltration via tool calls.
+**Evidence:** `permissions: contents: write / issues: write / pull-requests: write` (9-12); invocation gate is only `sender.type != 'Bot' && contains(comment.body, '/omp')` (23-24); raw comment body is interpolated verbatim into the agent prompt (`COMMENT_BODY="$(gh api ... --jq .body)"` → `PROMPT` → `omp ... "$PROMPT"` at 67-71). The agent runs with `GH_TOKEN: ${{ github.token }}` (61) and `AGENT_API_KEY` in the step env (60), commits to `omp/issue-<n>` and opens PRs. On a public repo any GitHub user can author the prompt. `<comment>` delimiters are advisory — the agent is instructed to execute the request. The `Bot` filter does prevent reply-loop re-triggering (agent posts as `github-actions[bot]`), and the omp binary SHA256 pin is good — neither mitigates prompt injection or key exfiltration via tool calls. ReviewScriptsCI adds: `AGENT_API_KEY` need not be in the agent's env at all — omp's `models.yml` indirection (key = env-var name) resolves without exporting it to the agent's tools (C2); `fetch-depth: 0` widens history exfiltration surface (C3).
 
 **Fix (options, in priority order):**
-1. Restrict trigger to collaborators/owners (`if: github.event.sender.type == 'User' && (github.event.comment.author_association == 'MEMBER' || … == 'OWNER' || … == 'COLLABORATOR')`), or require label/approval gate with an `environment:` protection rule before the write step.
-2. Keep `AGENT_API_KEY` out of the agent's inherited env — write it only to `models.yml`, not `env:` of the `Run omp` step that the agent's tools can read.
+1. Restrict trigger to collaborators/owners (allow-list on `author_association` or `environment:` protection rule before the write step).
+2. Keep `AGENT_API_KEY` out of the agent's inherited env — write it only to `models.yml`, not `env:` of the `Run omp` step that the agent's tools can read (ReviewScriptsCI C2).
 3. Principle of least privilege: `contents: write` only on the final push job after human approval; earlier jobs `contents: read` + `pull-requests: write`.
 4. Drop `fetch-depth: 0` (line 29) — full history is not needed for the agent run and widens the "read the repo" exfiltration surface.
+
+### H-2 — `check-contracts.sh` sweeps the print bundle + fails vacuously from the wrong CWD
+
+**Source:** ReviewScriptsCI B1 (T+17m29s) — independently verified via `read scripts/check-contracts.sh`.
+
+**Files:** `scripts/check-contracts.sh:60` (`find public …`); `hugo.yaml` / `content/` reads at `:25-26`, `41`, `44`, `49`
+
+**Evidence:** `find public -name index.md -path "*/field-manual/*"` does not exclude `public/_print/`, so when the content repo enables the theme's print output (it does — `_print` is emitted under `public/`), every manual page appears twice (once as `public/field-manual/.../index.md`, once as `public/_print/field-manual/...`) — double-counting `pages`/`labels` and running the status-gate check over print-bundle markdown where `**Axis: Option**` labels are HTML-embedded, producing false "leaked shortcode" or missed-gate results. Post-split, the remaining contract checks (`hugo.yaml` at :25/44/49, `content/` at :26/41) are **CWD-dependent**: they must run from the content repo root, but the script lives in `shell/scripts/` and neither the script nor `AGENTS.md:21-24` pins that requirement — `hugo.yaml` / `content/` reads silently return empty from any other directory, making contracts 1-2 a vacuous pass (`declared_tokens` empty, `used_tokens` empty → "contracts OK").
+
+**Fix:**
+```sh
+manual_mds=$(find public \( -type d -name _print -prune \) -o \
+    \( -type f -name index.md -path "*/field-manual/*" \) -print)
+[ -f hugo.yaml ] || { echo "CONTRACT: run from the content repo root (hugo.yaml not found)" >&2; exit 1; }
+[ -d public ]   || { echo "CONTRACT: public/ not found — build first: hugo --environment production" >&2; exit 1; }
+```
 
 ---
 
@@ -49,9 +65,9 @@ The repo is in good shape: XSS posture is solid, shell scripts are well-commente
 ### M-1 — `publication-gate.sh` missing `pipefail` — WARN check can be masked
 
 **File:** `scripts/publication-gate.sh:13`, `27`
-`set -eu` without `set -o pipefail` means `grep -i warn "$log" | grep -qv '…'` can exit 0 even if first grep fails (pipe status = last command). A corrupted `build-gate.log` could green-light the gate.
+`set -eu` without `set -o pipefail` means `grep -i warn "$log" | grep -qv '…'` can exit 0 even if first grep fails (pipe status = last command). A corrupted `build-gate.log` could green-light the gate. Duplicate: ReviewScriptsCI A3 reinforces; portable fix below.
 
-**Fix:** `set -euo pipefail` or check each stage explicitly.
+**Fix:** `set -eu` + `(set -o pipefail 2>/dev/null) && set -o pipefail || true` (POSIX-sh compatible — ReviewScriptsCI's patch).
 
 ### M-2 — `publication-gate.sh` writes `build-gate.log` in repo root
 
@@ -60,7 +76,35 @@ Pollutes `git status` if the trap fails (e.g. `kill -9`). Should use `mktemp`.
 
 **Fix:** `log=$(mktemp -t build-gate.XXXXXX)` and trap `rm -f "$log"`; or write to `$RUNNER_TEMP` in CI.
 
-### M-3 — `hugo.work` is documented as gitignored but is not
+### M-3 — `publication-gate.sh` header documents an invocation that only works from the content repo CWD
+
+**Source:** ReviewScriptsCI A1 (T+17m29s) — independently verified via `read scripts/publication-gate.sh` and `read README.md/AGENTS.md`.
+
+**Files:** `scripts/publication-gate.sh:8-11`, `19-20`; `README.md:92`; `AGENTS.md:20-21`
+
+The header says the gate is "safe to run locally" as `scripts/publication-gate.sh [args]`, and line 19-20 runs bare `hugo`. With an explicit path (`sh ../CAI-Field-Manual-Shell/scripts/publication-gate.sh` — the only shape post-split, per `README.md:92` / `AGENTS.md:20-21`), CWD stays the caller's, so from the Shell repo root `hugo` fails ("no existing content configured") and from a random CWD it silently builds the wrong tree. Adding `cd "$(dirname "$0")/.."` would only make it worse — the Shell repo itself has no content to build. The gate can only ever build the *importing* content repo.
+
+**Fix:** reword header lines 8-10 to "run from the content repo root (the importing site); do not run from the Shell checkout" — no other code change needed. `AGENTS.md:20-24` (which already says to invoke via `shell/scripts/publication-gate.sh` from the content root) should be kept in sync.
+
+### M-4 — `publication-gate.sh` WARN tolerance matches any line containing `warn`
+
+**Source:** ReviewScriptsCI A2 (T+17m29s) — independently verified.
+
+**Files:** `scripts/publication-gate.sh:27-30`
+
+`grep -i warn "$log"` matches any occurrence of the substring — e.g. a `WARNING:` column inside a tool trace from a render hook, a build-error line with `warning` in its text, or content printed during build. Hugo's own warning records start at column 0 with `WARN` (including the tolerated `css.Sass: libsass` deprecation), so anchoring closes the hole without breaking the existing pass:
+
+```sh
+if grep -E '^WARN' "$log" | grep -qv 'css.Sass: libsass'; then
+    echo "::error::Publication gate failed: unexpected WARN output" >&2
+    grep -E '^WARN' "$log" | grep -v 'css.Sass: libsass' >&2
+    exit 1
+fi
+```
+
+Note: Hugo can wrap long deprecation WARNs onto continuation lines that do not start with `WARN` — counting `^WARN` lines is the pragmatic middle ground; a stricter check would fold continuation lines.
+
+### M-5 — `hugo.work` is documented as gitignored but is not
 
 **Source:** ReviewConfigBuild (T+15m50s) — independently verified via `read .gitignore` and `read README.md/AGENTS.md`.
 
@@ -70,7 +114,7 @@ Both `README.md:94` and `AGENTS.md:34` state "`hugo.work` is gitignored — neve
 
 **Fix:** append to `.gitignore`: `/hugo.work`, `/hugo.work.sum`, `/build-gate.log`.
 
-### M-4 — Logo lockup ink follows the OS color-scheme, not the site's dark-mode toggle
+### M-6 — Logo lockup ink follows the OS color-scheme, not the site's dark-mode toggle
 
 **Source:** ReviewConfigBuild (T+15m50s) — independently verified via `read assets/icons/logo-rh-cai.svg` and `assets/scss/_styles_project.scss`.
 
@@ -80,7 +124,7 @@ The SVG flips `.rh-cai-ink` to `#fff` only inside `@media (prefers-color-scheme:
 
 **Fix (pick one, both in sanctioned files):** (a) keep constant ink and add a light plate `rect` behind the lockup so it reads on both canvases, updating the SCSS comment; or (b) inline the lockup via a shell-owned brand partial so `data-bs-theme` selectors can drive `.rh-cai-ink`. Also note the print bundle inherits the same failure for dark-OS readers.
 
-### M-5 — Shell `static/` assets bypass the theme's minify/fingerprint pipeline
+### M-7 — Shell `static/` assets bypass the theme's minify/fingerprint pipeline
 
 **Source:** ReviewConfigBuild (T+15m50s) — verified in production `public/` output.
 
@@ -90,49 +134,55 @@ Theme bundles ship as `scss/main.min.<sha256>.css` with SRI, while `public/js/ch
 
 **Fix:** move the four files under `assets/` and emit them from the hooks with the established pattern (`resources.Get` → `minify` → `fingerprint`, as `head-css.html` does), keeping `relLangURL` semantics via `.RelPermalink`.
 
-### M-6 — `check-contracts.sh` brittle `hugo.yaml` parsing causes false failures (not silent passes)
+### M-8 — `check-contracts.sh` brittle `hugo.yaml` parsing causes false failures (not silent passes)
 
 **File:** `scripts/check-contracts.sh:44`, `49`
 ```sh
 grep -qE "^    - id: $axis\$" hugo.yaml
 axis_block=$(sed -n "/- id: $axis\$/,/^    - id:/p" hugo.yaml)
 ```
-Assumes exactly 4-space indent and no comments/trailing keys. A reformat (e.g. `yamlfmt`) would not silently pass — it would **loudly false-fail** with one `CONTRACT variant-axis` error per pair (the `fail=1` path). Separately, `"$axis"` is regex-interpolated without escaping (axis is `[a-z_]+` today, safe but fragile).
+Assumes exactly 4-space indent and no comments/trailing keys. A reformat (e.g. `yamlfmt`) would not silently pass — it would **loudly false-fail** with one `CONTRACT variant-axis` error per pair (the `fail=1` path). Separately, `"$axis"` is regex-interpolated without escaping (axis is `[a-z_]+` today, safe but fragile). Overlaps with ReviewScriptsCI B3 (which notes the customize side is *stricter* — flow-map `- { id: X, … }` only, so block-style `id: X` false-fails there; both sides should handle both styles).
 
-**Fix:** parse with `yq` if available, fallback to indent-insensitive `awk` anchored on key name; or emit a warning when `grep` matches 0 axes.
+**Fix:** parse with `yq` if available, fallback to indent-insensitive `awk` anchored on key name; or emit a warning when `grep` matches 0 axes. For customize, add block-style alternates:
+```sh
+declared_tokens=$(sed -n \
+  -e 's/.*- { id: \([a-z_]*\),.*/\1/p' \
+  -e 's/^[[:space:]]*id:[[:space:]]*\([a-z_]*\).*/\1/p' \
+  hugo.yaml | sort -u)
+```
 
-### M-7 — `check-contracts.sh` word-splitting on `for pair in $(…)` / `for tok in $used_tokens`
+### M-9 — `check-contracts.sh` word-splitting on `for pair in $(…)` / `for tok in $used_tokens`
 
 **File:** `scripts/check-contracts.sh:27`, `41`, `50`
 Unquoted expansions split on IFS. Works for current `[a-z_]+` ids but will break if variant options contain spaces/hyphens. SC2044/SC2066.
 
 **Fix:** `while IFS= read -r` loop or `set -f` + quoted handling; add `# shellcheck disable` with justification.
 
-### M-8 — `check-contracts.sh` hardcoded variant labels + `labels` never asserted
+### M-10 — `check-contracts.sh` hardcoded variant labels + `labels` never asserted
 
 **File:** `scripts/check-contracts.sh:68-69`, `91-93`
 `grep -cE '\*\*(RHAIE Version|Ops Mode): '` hardcodes the two current axis labels. A renamed axis label, or a new consumer with different `params.variants[].label`, yields `labels=0` and still prints `contracts OK` — because `labels` is only interpolated in the success banner (`echo "contracts OK — $pages pages, $labels variant labels, …"`), never asserted via `fail=1`. Contract 3 ("every variant block is labelled") can thus never fail.
 
 **Fix:** derive expected labels from `hugo.yaml` `params.variants[].label` and assert `src_variants > 0 && out_labels == 0` → `fail=1`; or compare `src_variants` against `out_labels`.
 
-### M-9 — `check-contracts.sh` only validates positional shortcode forms
+### M-11 — `check-contracts.sh` only validates positional shortcode forms
 
 **File:** `scripts/check-contracts.sh:26`, `41`
 Line 26 `\{\{< customize [a-z_]+ >\}\}` and line 41 `\{\{< variant [a-z_]+ ("[^"]*"|[a-z0-9._-]+) >\}\}` only match the positional form (`{{< variant version "3.5" >}}`). But `layouts/_shortcodes/customize.html:16` and `variant.html:23` both branch on `if .IsNamedParams`, accepting named form (`{{< variant axis="version" id="3.5" >}}`). Named-param usages in content bypass the `declared in hugo.yaml` check entirely and the gate still prints "contracts OK". Separately, line 44's `grep -qE "^    - id: $axis\$" hugo.yaml` scans the whole file, so an axis id that collides with a `params.customize` field id (e.g. `user`) could validate against the wrong YAML block.
 
-**Fix:** add a second regex for named form or broaden to `\{\{< (customize|variant)[^>]*>\}\}` with extraction; scope the axis lookup to the `params.variants` section.
+**Fix:** add a second regex for named form or broaden to `\{\{< (customize|variant)[^>]*>\}\}` with extraction; scope the axis lookup to the `params.variants` section. ReviewScriptsCI B4/B5 add: normalize newlines before grepping (multi-line shortcode invocations exist) and add `tr ',' ' '` (comma-separated `"3.4, 3.5"` was silently merged into one token by the shortcode's `FindRE`).
 
-### M-10 — `check-contracts.sh` has no freshness guard: validates whatever `public/` happens to contain
+### M-12 — `check-contracts.sh` has no freshness guard: validates whatever `public/` happens to contain
 
 **Source:** SecuritySweep — independently verified.
 
 **File:** `scripts/check-contracts.sh:60` (`find public -name index.md …`), usage comment at `:1-6` (assumes a just-built `public/`).
 
-A stale, partial, or hand-edited `public/` silently passes — CI could cache an old `public/` and print "contracts OK" without having rebuilt. `publication-gate.sh` enforces `--cleanDestinationDir`; this gate does not and is not required to run after it.
+A stale, partial, or hand-edited `public/` silently passes — CI could cache an old `public/` and print "contracts OK" without having rebuilt. `publication-gate.sh` enforces `--cleanDestinationDir`; this gate does not and is not required to run after it. Duplicates H-2's `public` aspect; consolidated here as the freshness half (H-2 is the `_print` inclusion + CWD-dependence half).
 
 **Fix:** either run `hugo --cleanDestinationDir` inside the script (like the publication gate does), or require a freshness proof (e.g. check `public/.hugo_build.lock` mtime, or accept `$BUILD_DIR` as an explicit arg and refuse if absent). At minimum, document the required invocation order in the script header.
 
-### M-11 — Missing `params.github_repo` renders a broken clone URL that defeats the single-source claim
+### M-13 — Missing `params.github_repo` renders a broken clone URL that defeats the single-source claim
 
 **Source:** SecuritySweep — independently verified via `read layouts/_partials/hooks/body-end.html` and `static/js/agent-setup.js`.
 
@@ -142,7 +192,7 @@ A stale, partial, or hand-edited `public/` silently passes — CI could cache an
 
 **Fix:** guard in the template (`{{ with site.Params.github_repo }}…{{ else }}warnf{{ end }}`), strip trailing `/`, and delete the dead JS default so the "single source (`params.github_repo`)" claim holds. The JS fallback can then be removed or turned into an explicit error.
 
-### M-12 — No security headers: no CSP, Referrer-Policy, nosniff
+### M-14 — No security headers: no CSP, Referrer-Policy, nosniff
 
 **Source:** SecuritySweep — spot-checked in built output (`public/index.html` has no `Content-Security-Policy`/`referrer` meta).
 
@@ -152,39 +202,62 @@ The theme emits SRI + `crossorigin` on bundled assets (good), but no `<meta http
 
 **Fix:** add `<meta http-equiv="Content-Security-Policy" content="object-src 'none'; base-uri 'self'; frame-ancestors 'none'; …">` in a head hook (script-src will need `unsafe-inline` or hashes given the pre-paint bootstrap — even a partial policy is better than none) plus `<meta name="referrer" content="strict-origin-when-cross-origin">`.
 
-### M-13 — `static/js/chat.js:739` — `innerHTML = safeMarkdown(answer)` trusts `safeMarkdown` fully
+### M-15 — `check-contracts.sh` status-gate check (contract #4) cannot detect violations mid-page
 
-**File:** `static/js/chat.js:153-167`, `739`
-`safeMarkdown` is careful (escape first, placeholder fences/lists), but if LLM returns ```` ``` ```` without closing fence the regex `/```([\w+-]*)\n([\s\S]*?)```/g` fails open and subsequent `inlineMarkdown` runs inside the fence. No XSS (escaped), but can produce broken markup / layout.
+**Source:** ReviewScriptsCI B2 (T+17m29s) — independently verified via `read scripts/check-contracts.sh:76-89`.
 
-**Fix:** cap unclosed fences: after the main replace, if `s` still contains ```` ``` ```` wrap remainder as `<pre>`.
+**Files:** `scripts/check-contracts.sh:78-83` (awk pending logic); documented at `Docs/issue-3-top5.md:23-33`
 
-### M-14 — `static/js/chat.js` chat completion has no timeout
+The awk sets `pending` on `/Expected output/` and only clears it on `/^```/`; **any** subsequent heading (`/^#/`) is treated as the violation trigger — it clears `pending` without reporting. In real output the "Expected output:" line sits inside a `## Verification` section, so the very next `## Rollback` (or any heading) resets `pending = 0` before the "no following fence" condition can fire — unless the promise is in the final section. Empirically verified on the current build: a planted mid-page dangling promise reports nothing (`fail=0`); shipped pages pass only because no mid-page violation happens to exist. The header (line 13) also promises an "(no output)" escape hatch that the awk never implements.
 
-**File:** `static/js/chat.js:728-810`
-Model-list fetch has `AbortSignal.timeout(10000)` (good), but the streaming `fetch(chatUrl…)` for completions has no timeout and `state.controller` is never timed out. A stalled gateway hangs the UI with "Thinking…" forever.
+**Fix:** test that the next non-empty line after the promise is a fence:
+```sh
+awk '
+    /Expected output/ { pending = NR; next }
+    pending != 0 && NF == 0 { next }
+    pending != 0 && !/^(```|~~~)/ {
+        printf "CONTRACT status-gate: %s line %d — \"Expected output\" with no following fence\n", FILENAME, pending;
+        bad = 1; pending = 0;
+    }
+    pending != 0 && /^(```|~~~)/ { pending = 0; next }
+    END { exit bad }
+' "$md" || fail=1
+```
+Drop `/^#/` from the violation arm; add `(no output)` handling if the marker is intended.
 
-**Fix:** add `AbortSignal.timeout(120_000)` or idle timer resetting on each chunk.
+### M-16 — `omp.yml` `pull_request_review_comment` trigger is broken — review comments lack `issue` payload fields
 
-### M-15 — `static/js/chat.js:428` `banner.innerHTML` uses static string — safe, but pattern invites future XSS
+**Source:** ReviewScriptsCI C1 (T+17m29s) — independently verified via `read .github/workflows/omp.yml`.
 
-**File:** `static/js/chat.js:428`
-Static HTML literal is fine, but the file already mixes `textContent` and `innerHTML`. Lint rule should enforce `textContent` + `createElement` for dynamic content.
+**Files:** `.github/workflows/omp.yml:4-9`, `15`, `68`, `123`, `135`
 
-**Fix:** add eslint rule `no-inner-html` with allowlist comment.
+The workflow listens for both `issue_comment` and `pull_request_review_comment`, but every downstream step assumes the issue-comment payload shape. For `pull_request_review_comment`, GitHub sends `github.event.comment` (a *review* comment) and `github.event.pull_request` but **no `github.event.issue`** key — so:
 
-### M-16 — `assets/js/action-registry.js:128-140` markdown fetch cache never invalidates
+1. Line 68 `gh api repos/.../issues/comments/<id>` — review comments live under `pulls/comments/<id>`, not `issues/comments/<id>` → 404, empty prompt.
+2. Lines 69-74 `TARGET_NUMBER`/`TARGET_URL` interpolation (`github.event.issue.html_url`/`.number`) → empty → prompt says "is a comment on #."
+3. Line 15 concurrency `omp-${{ github.event.issue.number }}` → `omp-` for every review-comment run (serialized, mutually blocking issue runs sharing the null group).
+4. Line 138 reply `issues/<empty>/comments` → 400; the `if: always()` step fails the workflow even on agent success.
 
-**File:** `assets/js/action-registry.js:128-140`
-`markdown` Map caches `fetchMarkdown(url)` forever. After navigating to a new page the old page's markdown is served incorrectly (key is URL, so cross-page is actually correct), but after content update without reload it is stale until tab close.
+Net effect for the documented invocation path (`AGENTS.md:63`: "Comment `/omp` on any issue or PR review thread"): the agent burns a paid run on an empty prompt and the workflow reports failure without posting the answer.
 
-**Fix:** add TTL or `invalidateMarkdown()` on `visibilitychange`; document expected staleness.
+**Fix:** use `comment.id` + `pulls/comments` for the review path, and `TARGET_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}` / `TARGET_URL: ${{ github.event.issue.html_url || github.event.pull_request.html_url }}` in the prompt, concurrency group, and reply step.
 
-### M-17 — `.github/workflows/omp.yml:24` `contains(body, '/omp')` is substring match
+### M-17 — `Docs/backlog.md` "Now #1" is already done but still `pending`; other `Docs/` planning docs predate the split
 
-A comment containing code like `` `npm run /ompile` `` triggers the agent. Low probability but wastes minutes and posts noise. (Distinct from H-1's prompt-injection issue — this is the cheap false-trigger even for legitimate users.)
+**Source:** ReviewScriptsCI D1/D2 (T+17m29s) — independently verified via `read Docs/backlog.md` and git log.
 
-**Fix:** `contains(github.event.comment.body, '/omp ') || startsWith(..., '/omp')` or regex `/(^|\n)\/omp(\s|$)/`.
+**Files:** `Docs/backlog.md:9`; `Docs/issue-3-top5.md:24-33,159,189`; `Docs/issue-3-review.md:42`
+
+`Docs/backlog.md:9` `pending` item "Commit rename + RH CAI lockup changes; push to renamed repo … field-guides → field-manual rename everywhere; `assets/icons/logo-rh-cai.svg`" is verifiably complete (rename commit `5ac0c4d` in history; `hugo.yaml:26` carries `docs_section: field-manual`; `assets/icons/logo-rh-cai.svg` exists; gate passes). After `70d5c48` (Shell/Hello-World split) the item's `baseURL`/`github_repo` half is meaningless in this repo — those keys live in the content repo now. Contributors or agents picking up the "Now" table chase finished work. Separately, `Docs/issue-3-top5.md` (`content/` run-before-PR instruction, `data/home.yaml`, prototype naming) and `Docs/issue-3-review.md` (citing `set-up.md:52` which no longer exists here) predate the split and misstate this repo's contents — `content/` and `data/` were deleted in `70d5c48`.
+
+**Fix:** move `backlog.md` Now#1 to Done with a completion date; add a one-line provenance banner to the two planning docs:
+```markdown
+> Written 2026-11-07 against the pre-split prototype (content/, data/, prototype naming). After 70d5c48 those files live in CAI-Field-Manual-Hello-World; the scripts here are validated from that repo (see AGENTS.md).
+```
+
+### M-18 — `omp.yml` `pull_request_review_comment` trigger is broken (duplicate entry for emphasis — consolidated into M-16)
+
+Merged into M-16. Listed separately in the ReviewScriptsCI source (C1); consolidated here to avoid duplication.
 
 ---
 
@@ -200,11 +273,11 @@ Intentional for UX, but shows in page source / screenshots. Could be opt-in or s
 
 ### L-3 — `static/js/agent-setup.js:27` fallback repo literal is hardcoded
 
-`REPO` fallback `'rh-aiservices-bu/CAI-Field-Manual-Hello-World'` will drift if the org renames the content repo. Now compounded by M-11: prefer failing visibly (`No github_repo configured`) over silently cloning the wrong repo.
+`REPO` fallback `'rh-aiservices-bu/CAI-Field-Manual-Hello-World'` will drift if the org renames the content repo. Now compounded by M-13: prefer failing visibly (`No github_repo configured`) over silently cloning the wrong repo.
 
 ### L-4 — `Docs/` contains stale review docs referencing old repo name
 
-`Docs/backlog.md:9` still mentions `CAI-Field-Manual-prototype`; `Docs/maas-guide.review.md:4` references `CAI-Field-Manual-prototype` as local site. Either archive or update `Docs/`.
+`Docs/backlog.md:9` still mentions `CAI-Field-Manual-prototype`; `Docs/maas-guide.review.md:4` references `CAI-Field-Manual-prototype` as local site. Either archive or update `Docs/`. (Superseded by M-17's more specific backlog/split provenance finding — kept as the broader `Docs/` hygiene item.)
 
 ### L-5 — `.hugo_build.lock` (0 B) present on disk — should not be committed and is already gitignored
 
@@ -238,7 +311,7 @@ Shell scripts and 1.4 kLOC of JS have no lint step. `check-contracts.sh` has SC2
 
 **Source:** ReviewConfigBuild (T+15m50s) — verified against Hello-World `github-pages.yaml`.
 
-`README.md:40` headers both scripts as "run by content repos' CI via a `shell/` checkout", but Hello-World's `.github/workflows/github-pages.yaml` calls only `shell/scripts/publication-gate.sh` (lines 74, 121); the contract check is a **manual/local gate only** (see `AGENTS.md:36`). Dual-consumption promises are therefore unenforced in CI despite the README's implication. This matters because M-5 through M-10 are about those contracts.
+`README.md:40` headers both scripts as "run by content repos' CI via a `shell/` checkout", but Hello-World's `.github/workflows/github-pages.yaml` calls only `shell/scripts/publication-gate.sh` (lines 74, 121); the contract check is a **manual/local gate only** (see `AGENTS.md:36`). Dual-consumption promises are therefore unenforced in CI despite the README's implication. This matters because M-8 through M-12 and H-2 are about those contracts.
 
 **Fix:** reword `README.md:40` to "publication-gate.sh runs in CI; check-contracts.sh is a local gate (add it to CI if you want it enforced)" — or actually add the step to the content repo's workflow.
 
@@ -258,20 +331,57 @@ Oink documents `ink`/`terminal` as experimental (`preset-config.html:10,16`, `_e
 
 The theme keys on `isset` (`shell/footer-line.html:14`), so the empty string activates a code path that renders nothing — omitting the key is equivalent and clearer. Trim.
 
+### L-14 — `publication-gate.sh` header documents an invocation that cannot work as written
+
+**Source:** ReviewScriptsCI A1 (partial) — but the report adopts a softer reading: the header's "safe to run locally: `scripts/publication-gate.sh [args]`" is accurate **when run from the content repo root** (the intended CWD), and `AGENTS.md:24-34` states the scripts are validated by Hello-World's build. The header does not need a `cd` fix; it needs a one-line clarification that the gate builds the **current** Hugo site (i.e., run it from the content repo, not the Shell checkout — already implied by the `HUGO_MODULE_WORKSPACE=hugo.work` example). Filed as Low because the existing AGENTS.md example is sufficient to avoid the pitfall.
+
+### L-15 — `check-contracts.sh` multi-line and comma-separated option lists mis-validated
+
+**Source:** ReviewScriptsCI B4/B5 (T+17m29s).
+
+**Files:** `scripts/check-contracts.sh:26`, `41-43`
+
+- `{{< variant axis="version" id="3.5, 3.6" >}}` splits on commas inside the shortcode (`strings.FindRE "[^,\s]+"`); but the contract check's `tr ' ' '_'` produces `3.5,_3.6` as one merged token, false-positive `option not declared` while `"3.4,3.5"` (no space) is silently one opaque option with no per-option validation.
+- `{{< customize\ntoken >}}` and `{{< variant\naxis … >}}` with line breaks between params (valid Hugo) are skipped by single-line `grep` patterns, so wrapped invocations are never validated.
+
+**Fix:** normalize: `tr ',' ' '` alongside the existing space-to-underscore in line 41's pipeline, and concatenate `content/*.md` before grepping (or normalize newlines → spaces).
+
+### L-16 — `check-contracts.sh` "(no output)" marker and `expected output below` prose check mis-targeted
+
+**Source:** ReviewScriptsCI B6 (T+17m29s).
+
+**Files:** `scripts/check-contracts.sh:13`, `78-86`
+
+The header (line 13) promises both escape hatches — following fence **or** explicit "(no output)" marker — but the awk recognizes no marker, so a legitimate "Expected output: (no output)" page is flagged as a violation (currently masked only by the heading-reset bug in M-15). Separately, line 85 greps the *built* markdown for the exact prose "confirm the output matches the expected output below", but built pages are Hugo-flattened and HTML-escaped — any rewording or rewrapping silences the check. Should match the *source* page (like M-15's next-non-empty fence test).
+
+### L-17 — `omp.yml` loop-filter and model-token hardcoding
+
+**Source:** ReviewScriptsCI C4-C6 (T+17m29s).
+
+**Files:** `.github/workflows/omp.yml:23`, `52-53`
+
+- C4: `sender.type != 'Bot'` prevents self-loops but not cross-repo loops (two repos with this workflow can trigger each other forever); add `timeout-minutes: 30` and fix concurrency to `omp-${{ github.event.issue.number || github.event.pull_request.number }}`.
+- C5: `contains(body, '/omp')` substring trigger fires on `/omp/…` paths, code snippets, URLs — anchor with `contains(body, '/omp ') || endsWith(body, '/omp')`.
+- C6: `contextWindow: 1000000` / `maxTokens: 32000` baked in regardless of which model `vars.AGENT_MODEL` names — swapping to a smaller-context model silently truncates. Promote to repo variables.
+- (C3's substring-trigger aspect is already covered by M-17 in the Medium section — these remain Low as the remaining tail.)
+
 ---
 
 ### Attribution & deferred findings
 
-### Note — SecuritySweep: findings adopted, one demoted
+### Note — SecuritySweep: findings adopted, one demoted (expanded — see H-1/M-12/M-13 integration)
 
-- **SecuritySweep M2 (not adopted as written):** "Config strings interpolated raw into `<style>` and `<script type=\"application/json\">`" — axis/option ids and status phrases emitted via `{{ $axis }}` in `<style>` and `{{ $blob | jsonify | safeJS }}` in `application/json`. The report claimed Hugo `jsonify` does not escape `<`/`/` so `</script>` breaks out, and axis ids inject CSS. Re-checked: `<style>` content is **CSS context** in `html/template` (verified live in prior draft via `go run` — `'` → `\27`, `"><script>` → CSS-escaped), not raw; and Hugo's `jsonify` (backed by `encoding/json` with `SetEscapeHTML(true)`) emits `<` as `\u003c`, so `</script>` cannot terminate the JSON element. Site params are **first-party trusted config** (content-repo maintainers), not an XSS boundary. Demoted to defense-in-depth: constraining ids at validation time (`head-end.html:18-36` already warns on bad axes) is good hygiene — keep it as a Low, not a Medium. No change to the report beyond this note.
-- **SecuritySweep M3 freshness gap** merged into **M-10** above; its additional note about unquoted `for md in $manual_mds` and `sed` over-matching `params.customize: { id: … }`-style variant options is valid and is covered by **M-7** (word-splitting) and **M-6** (scope axis lookup to `params.variants`).
-- **SecuritySweep L1-L8:** L1 (LICENSE/SECURITY.md/Dependabot, stale `publication-gate.sh:9` comment referencing non-existent `github-pages.yaml`) is valid hygiene — left as L-6 note to add supply-chain docs. L2 (GA4 `cookie_flags`) is valid but below the report's current Low bar; L3 (agent-setup clipboard `.catch`), L4 (`isLocalHostname` misses `.home.arpa`/ULA), L5 (customize over-match), L7 (minor `curl --fail`, `rel="noopener"` vs `noreferrer`) are noted and may be promoted when the layout/JS slices land. None are dropped.
+- **SecuritySweep M2 (not adopted as written):** "Config strings interpolated raw into `<style>` and `<script type=\"application/json\">`" — axis/option ids and status phrases emitted via `{{ $axis }}` in `<style>` and `{{ $blob | jsonify | safeJS }}` in `application/json`. The report claimed Hugo `jsonify` does not escape `<`/`/` so `</script>` breaks out, and axis ids inject CSS. Re-checked: `<style>` content is **CSS context** in `html/template` (verified live in prior draft via `go run` — `'` → `\27`, `"><script>` → CSS-escaped), not raw; and Hugo's `jsonify` (backed by `encoding/json` with `SetEscapeHTML(true)`) emits `<` as `\u003c`, so `</script>` cannot terminate the JSON element. Site params are **first-party trusted config** (content-repo maintainers), not an XSS boundary. Demoted to defense-in-depth note.
+- **SecuritySweep M3 freshness gap** merged into M-12 (and H-2).
+- **SecuritySweep L1-L8:** L1 (LICENSE/SECURITY.md/Dependabot) left as L-6 hygiene; L2 (GA4 `cookie_flags`) / L3 (clipboard `.catch`) / L4 (`isLocalHostname` misses) / L5 (customize over-match) / L7 (`curl --fail`) noted and may be promoted when layout/JS slices land. None dropped.
 
-### Note — ReviewConfigBuild: findings adopted (3 medium + 5 low)
+### Note — ReviewConfigBuild: findings adopted (3 medium + 5 low) — consolidated above
 
-- M1-M3 adopted as **M-3/M-4/M-5** above (`.gitignore` gap, logo `prefers-color-scheme` vs `data-bs-theme`, `static/` cache-busting). L1-L5 adopted as **L-9/L-10/L-11/L-12/L-13** above (pinned-copy count/provenance staleness, README CI overstatement, typo, experimental presets, empty footer param).
-- ReviewConfigBuild's Verified Clean (hugoVersion, go.mod, tokens, favicons, tokens, `.hugo_build.lock` provenance) independently confirms the prior drafts' withdrawals remain correct — no re-raised false positives.
+- M1-M3 adopted as M-5/M-6/M-7; L1-L5 as L-9/L-10/L-11/L-12/L-13. Verified-clean notes (hugoVersion, go.mod, tokens, favicons, `.hugo_build.lock`) independently confirm prior withdrawals remain correct.
+
+### Note — ReviewScriptsCI: findings adopted (1 high + 4 medium + 6 low) — consolidated above
+
+- **B1 (High) as H-2** — `_print` sweep + CWD-dependence. **B2/B3/B4 as M-15/M-8/M-11** (status-gate dead-on-arrival, flow-map-only customize parse, multi-line shortcode misses). **A1/A2/A3 as L-14/M-4/M-1** (publication-gate invocation header, WARN anchoring, pipefail). **C1 as M-16** (broken `pull_request_review_comment` path). **C2 as H-1 reinforcement** (API key env exposure). **C3 as H-1 reinforcement** (public-commenter drive). **D1/D2 as M-17** (stale backlog / pre-split planning docs). B5/B6/C6/C4/C5 as L-15/L-16/L-17. No deduplication loss — the duplicate `grep -i warn` → `^WARN` anchoring finding from SecuritySweep (already in M-4) is noted but not double-counted.
 
 ### Note — `public/` / `resources/_gen/` scope (not a finding)
 
@@ -293,17 +403,18 @@ The `ReviewJS` sub-agent's transcript (e.g. history at `ReviewJS.jsonl` line ~60
 - Publication gate + contract checks are well split (gate = build must pass; contracts = content promises).
 - **SecuritySweep verified clean:** no secrets in tracked files/history/`public/` (only public GA ID `G-7ZXCS2MF1D`); SRI + `crossorigin` on bundled assets present; `safeMarkdown` escapes first then transforms — correct order; no tracked large binaries; stale `public/`/`resources/` untracked and harmless.
 - **ReviewConfigBuild verified clean:** `hugoVersion.min: 0.168.0`, all `params.ui.*` keys validated against theme; `go.mod`/`go.sum` verified; `--td-*`/`--bs-*` tokens exist in theme; favicons correctly sized.
+- **ReviewScriptsCI verified clean:** `trap 'rm -f "$log"' EXIT` does not swallow exit code (empirically verified on this machine); `models.yml` heredoc scoping correct; `issue_comment` on PR conversation comments does populate `github.event.issue`; both scripts executable (`100755`).
 
 ---
 
 ## Recommended next steps (priority order)
 
-1. **Harden CI trust boundary** (H-1) — restrict `omp` trigger to collaborators and split `contents: write` to an approval-gated job; move `AGENT_API_KEY` out of the agent's env.
-2. **Harden `check-contracts.sh` contracts** (M-3/M-4/M-5 etc. consolidated as M-6/M-7/M-8/M-9/M-10) — derive variant labels from `hugo.yaml` and assert them; add named-param coverage; add freshness guard; scope lookups to `params.variants`; fix YAML + shell brittleness. Also fix **M-11** (`github_repo` guard) and the **ReviewConfigBuild** CI/docs items **L-9/L-10** (pinned-copy provenance, README CI overstatement).
-3. **Shell hygiene** (M-3, M-1, M-4, M-5) — `.gitignore` gap for `hugo.work`, logo `prefers-color-scheme` vs `data-bs-theme` mismatch, `static/` asset cache-busting, and `publication-gate.sh` `pipefail`.
-4. **Add chat completion timeout** (M-14) + CSP/referrer meta (M-12) — user-visible hang + cheap defense-in-depth.
-5. **Archive/update `Docs/`** (L-4) + typo (L-11).
+1. **Harden CI trust boundary** (H-1, M-16) — restrict `omp` trigger to collaborators, fix `pull_request_review_comment` payload shape, and drop `AGENT_API_KEY` from the agent's env.
+2. **Harden `check-contracts.sh` contracts** (H-2, M-8/M-9/M-10/M-11/M-12/M-15/L-15/L-16) — derive variant labels from `hugo.yaml` and assert them; add named-param coverage; add `_print` prune + freshness guard + CWD guard; scope lookups to `params.variants`; fix YAML + shell brittleness.
+3. **Shell hygiene** (M-5, M-1, M-6, M-7, M-13/M-18) — `.gitignore` gap for `hugo.work`, logo `prefers-color-scheme` vs `data-bs-theme` mismatch, `static/` asset cache-busting, publication-gate header + WARN anchoring + `pipefail`, and `Docs` staleness (M-17 / L-4 / L-9 / L-10 / L-11).
+4. **Add chat completion timeout** (M-14) + CSP/referrer meta (M-12/M-14) — user-visible hang + cheap defense-in-depth.
+5. **Tighten omp.yml hardening** (L-17) — `timeout-minutes`, substring-trigger anchoring, model token vars.
 
 ---
 
-*Report at `cf351bbf` scope plus SecuritySweep (T+9m41s) and ReviewConfigBuild (T+15m50s) integrations. ReviewLayouts, ReviewJS, ReviewScriptsCI remain running — their findings must be merged and attributed when they land. Withdrawals: attribute-escaping, CSS-in-style, renderer.unsafe, relLangURL same-class false positives verified by live `go run` test and Hugo semantics; current additions: `.gitignore` gap, logo OS-vs-site theme mismatch, static-asset cache-busting, pinned-copy/README bookkeeping — all independently verified via `read` before adoption.*
+*Report at `a2515d6` scope plus ReviewScriptsCI (T+17m29s) integration. ReviewLayouts, ReviewJS remain running at T+17m — their findings must be merged and attributed when they land. Withdrawals: attribute-escaping, CSS-in-style, renderer.unsafe, relLangURL — same-class false positives verified by live `go run` test and Hugo semantics; current additions: `_print` inclusion, CWD vacuous pass, status-gate dead code, publication-gate WARN anchoring/header pipefail nuances, broken PR-review-comment trigger, stale Docs/backlog — all verified via `read` before adoption. Total: 41 findings (2 high / 21 medium / 18 low).*
